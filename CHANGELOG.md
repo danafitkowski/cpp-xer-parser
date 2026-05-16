@@ -28,6 +28,10 @@ Initial public release. Companion to [`cpp-cpm-engine`](https://github.com/danaf
 - 2 test files cover the parser core (`test_xer_parser.py`) and the MIP 3.4 half-step generator (`test_half_step.py`).
 - All test fixtures are fully synthetic — every XER referenced in the test suite is built in-memory at test time. No real client data ships with the repo.
 
+### Engine compatibility
+
+Tested against `cpp-cpm-engine` v2.9.x (current as of 2026-05-16: v2.9.11+). The parse output is consumed by `cpm-engine.parseXER()` and is independent of the engine math; any `cpp-cpm-engine` 2.9.x version is compatible. Forward compatibility with future 2.x lines is intended but not guaranteed; the parse-output schema is the canonical interface contract.
+
 ### Companion repos
 
 - **[cpp-cpm-engine](https://github.com/danafitkowski/cpp-cpm-engine)** — The CPM engine that consumes data from this parser.
