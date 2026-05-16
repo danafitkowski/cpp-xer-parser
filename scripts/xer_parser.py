@@ -90,7 +90,7 @@ __all__ = [
     'get_udf_types', 'schema_diff', 'validate_schedule', 'aace_31r_compliance',
     # Generation
     'generate_xer',
-    # MIP 3.4 half-step
+    # Half-step XER (vendor-equivalent: SmartPM/Plannex)
     'compute_half_step_xer',
     # Constants
     'TABLE_ORDER', 'TABLE_FIELD_COUNTS', 'TABLE_FIELD_COUNTS_BY_VERSION',
@@ -2056,10 +2056,10 @@ def _write_table(lines, table_name, table_data):
 
 
 # ─────────────────────────────────────────────
-# MIP 3.4 HALF-STEP XER GENERATOR
+# HALF-STEP XER GENERATOR (vendor-equivalent: SmartPM/Plannex)
 # ─────────────────────────────────────────────
 
-#: Progress-only fields copied from updated → base in the MIP 3.4 half-step.
+#: Progress-only fields copied from updated → base in the half-step.
 #: These capture what actually happened without carrying forward any logic
 #: revisions the contractor made between updates.
 _HALF_STEP_PROGRESS_FIELDS = [
@@ -2090,10 +2090,9 @@ _HALF_STEP_FORBIDDEN_FIELDS = frozenset({
 
 
 def compute_half_step_xer(base_xer_path, updated_xer_path, output_xer_path):
-    """Generate an AACE 29R-03 MIP 3.4 half-step XER from two sequential schedule updates.
+    """Generate a half-step XER from two sequential schedule updates (vendor-equivalent: SmartPM/Plannex).
 
-    AACE 29R-03 MIP 3.4 — Modelled / Additive / Multiple Base — Contemporaneous
-    Split: start with the period-START schedule (base), apply ONLY the progress
+    Start with the period-START schedule (base), apply ONLY the progress
     fields (actual dates, remaining duration, percent complete, status) from the
     next update, and output a "half-step" schedule.  The result isolates the
     *progress impact* from the *logic-revision impact*: anything that moves in
@@ -2101,8 +2100,10 @@ def compute_half_step_xer(base_xer_path, updated_xer_path, output_xer_path):
     moves between the half-step and the full update moved because the contractor
     revised logic or scope mid-period.
 
-    SmartPM and Plannex ship this as their flagship feature; CPP cpm-engine v2.2
-    closes the gap.
+    Method classification: this is the vendor-equivalent of the SmartPM/Plannex
+    half-step XER generator. The SmartPM half-step itself is not an AACE-canonical
+    method; the closest AACE-canonical analogue is MIP 3.3 contemporaneous
+    split-window observation. CPP cpm-engine v2.2 closes the vendor-tooling gap.
 
     Methodology disclosures
     -----------------------
@@ -2114,7 +2115,7 @@ def compute_half_step_xer(base_xer_path, updated_xer_path, output_xer_path):
     * Resource assignments (TASKRSRC, RSRC, RSRCRATE) are out of scope for v1
       and are preserved from the base unchanged.
     * Activities present in the updated XER but absent from the base are NOT
-      added to the half-step — per MIP 3.4, the half-step shows base-logic +
+      added to the half-step — the half-step shows base-logic +
       actual-progress only.  Their task codes are logged in
       ``unmatched_in_updated`` for the analyst's awareness; these are typically
       activities the contractor added in the update (scope adds, splits, etc.).
@@ -2148,8 +2149,10 @@ def compute_half_step_xer(base_xer_path, updated_xer_path, output_xer_path):
         logic-revision layer, not the progress layer.
 
     Attribution:
-        AACE 29R-03 MIP 3.4 "Modelled / Additive / Multiple Base — Contemporaneous
-        Split"; CPP cpm-engine v2.2 half-step generator.
+        Vendor-equivalent: SmartPM/Plannex half-step XER generator. Closest
+        AACE-canonical analogue is MIP 3.3 contemporaneous split-window
+        observation; the SmartPM half-step itself is not canonical AACE.
+        CPP cpm-engine v2.2 half-step generator.
     """
     import copy
 
@@ -2223,11 +2226,13 @@ def compute_half_step_xer(base_xer_path, updated_xer_path, output_xer_path):
         if applied_any:
             progressed_count += 1
 
-    # ── 5. Inject MIP 3.4 attribution into PROJECT row ───────────
+    # ── 5. Inject attribution note into PROJECT row ───────────
     # Write a note into the proj_url or web_site field (commonly unused in
     # construction schedules, round-trips cleanly through P6 import).
     attribution_text = (
-        'Half-step XER produced by CPP cpm-engine v2.2 per AACE 29R-03 MIP 3.4.'
+        'Half-step XER produced by CPP cpm-engine v2.2 (vendor-equivalent: '
+        'SmartPM/Plannex half-step; closest AACE-canonical analogue is MIP 3.3 '
+        'contemporaneous split-window observation).'
     )
     project_records = get_table(half_step_data, 'PROJECT')
     for proj in project_records:

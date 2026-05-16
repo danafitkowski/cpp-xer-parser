@@ -15,7 +15,7 @@ Initial public release. Companion to [`cpp-cpm-engine`](https://github.com/danaf
 - **Calendar decoding** including full work-week patterns, special workdays, and holidays. Handles the nested-paren and regex-fallback `clndr_data` formats that real-world P6 exports use.
 - **Cross-reference maps** for WBS hierarchy (`build_wbs_map`), resource assignments (`build_resource_map`), predecessors and successors (`build_predecessor_map`), activity codes (`build_activity_code_map`), and user-defined fields (`build_udf_map`).
 - **Schedule summary report** generation (`print_summary` / `generate_summary`) covering file info, project metrics, schedule metrics, critical path, relationships, calendars, resources, and data quality.
-- **MIP 3.4 half-step XER generator** (`compute_half_step_xer`) — AACE 29R-03 MIP 3.4 ("Modelled / Additive / Multiple Base — Contemporaneous Split"). Isolates progress impact from logic-revision impact across consecutive schedule updates.
+- **Half-step XER generator** (`compute_half_step_xer`) — vendor-equivalent of SmartPM/Plannex half-step XER generator (closest AACE-canonical analogue is MIP 3.3 contemporaneous split-window observation; the SmartPM half-step itself is not canonical AACE). Isolates progress impact from logic-revision impact across consecutive schedule updates.
 - **BOM-aware encoding detection** (UTF-8 BOM / UTF-16 LE/BE BOM) — handles real-world P6 exports without manual encoding fiddling.
 - **Schedule integrity manifest** (`generate_xer_manifest`) — SHA-256 source hash, parse metadata, AACE 31R-03 compliance scoring. Requires the bundled `validation.py` + `config_profiles.py` stubs (included).
 - **UDF type classification** (`get_udf_types`) — distinguishes text / numeric / date / start-date / finish-date UDFs.
@@ -25,7 +25,7 @@ Initial public release. Companion to [`cpp-cpm-engine`](https://github.com/danaf
 
 ### Testing
 
-- 2 test files cover the parser core (`test_xer_parser.py`) and the MIP 3.4 half-step generator (`test_half_step.py`).
+- 2 test files cover the parser core (`test_xer_parser.py`) and the half-step generator (`test_half_step.py`).
 - All test fixtures are fully synthetic — every XER referenced in the test suite is built in-memory at test time. No real client data ships with the repo.
 
 ### Engine compatibility

@@ -75,13 +75,13 @@ for t in tasks[:3]:
 | Duration hours-to-days conversion    | `duration_hours_to_days(hours, calendar)`                             |
 | Schedule integrity manifest          | `generate_xer_manifest(data, xer_path, operator)`                     |
 | Schema drift between two XERs        | `schema_diff(data_a, data_b)`                                         |
-| MIP 3.4 half-step XER generator      | `compute_half_step_xer(base_path, updated_path, output_path)`         |
+| Half-step XER generator (SmartPM-equivalent) | `compute_half_step_xer(base_path, updated_path, output_path)`         |
 
 ---
 
-## MIP 3.4 half-step XER
+## Half-step XER (vendor-equivalent: SmartPM/Plannex)
 
-The most analytically interesting feature in the repo. The `compute_half_step_xer` function implements AACE 29R-03 MIP 3.4 ("Modelled / Additive / Multiple Base — Contemporaneous Split"): it takes a period-start schedule plus the next period's update, and produces a schedule that has **only the progress fields** copied from the updated schedule onto the base structure.
+The most analytically interesting feature in the repo. The `compute_half_step_xer` function is the vendor-equivalent of the SmartPM/Plannex "half-step" XER generator (closest AACE-canonical analogue is MIP 3.3 contemporaneous split-window observation; the SmartPM half-step itself is not an AACE-canonical method). It takes a period-start schedule plus the next period's update, and produces a schedule that has **only the progress fields** copied from the updated schedule onto the base structure.
 
 The forensic value: anything that moves in the half-step moved because work didn't happen as planned. Anything that moves between the half-step and the full update moved because the contractor revised logic or scope.
 
@@ -130,7 +130,7 @@ See `references/table-reference.md` for the complete field-by-field reference fo
 
 ```bash
 python tests/test_xer_parser.py     # core parser + generator smoke test
-python tests/test_half_step.py      # MIP 3.4 half-step generator
+python tests/test_half_step.py      # half-step generator (SmartPM-equivalent)
 ```
 
 Or with pytest:
