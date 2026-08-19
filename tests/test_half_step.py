@@ -2,7 +2,7 @@
 """
 Tests for compute_half_step_xer — AACE 29R-03 MIP 3.4 half-step XER generator.
 
-MIP 3.4 ("Modelled / Additive / Multiple Base — Contemporaneous Split") produces
+MIP 3.4 ("Observational / Dynamic / Contemporaneous Split") produces
 a "half-step" schedule: take the period-START schedule (base), apply ONLY the
 progress fields from the next update, and output a XER that isolates progress
 impact from logic-revision impact.

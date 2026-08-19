@@ -81,7 +81,7 @@ for t in tasks[:3]:
 
 ## Half-step XER (vendor-equivalent: SmartPM/Plannex)
 
-The most analytically interesting feature in the repo. The `compute_half_step_xer` function is the vendor-equivalent of the SmartPM/Plannex "half-step" XER generator (closest AACE-canonical analogue is MIP 3.3 contemporaneous split-window observation; the SmartPM half-step itself is not an AACE-canonical method). It takes a period-start schedule plus the next period's update, and produces a schedule that has **only the progress fields** copied from the updated schedule onto the base structure.
+The most analytically interesting feature in the repo. The `compute_half_step_xer` function implements the bifurcation procedure of AACE 29R-03 §2.3.D.2 ("Bifurcation: Creating a Progress-Only Half-Step Update" — the RP itself names the procedure "half-stepping or two-stepping"), which is how MIP 3.4 (Observational / Dynamic / Contemporaneous Split) splits each update. Vendor half-step tools (SmartPM, Plannex) are equivalents of this procedure. It takes a period-start schedule plus the next period's update, and produces a schedule that has **only the progress fields** copied from the updated schedule onto the base structure.
 
 The forensic value: anything that moves in the half-step moved because work didn't happen as planned. Anything that moves between the half-step and the full update moved because the contractor revised logic or scope.
 
