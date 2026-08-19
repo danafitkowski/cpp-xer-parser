@@ -2116,10 +2116,13 @@ def compute_half_step_xer(base_xer_path, updated_xer_path, output_xer_path):
     moves between the half-step and the full update moved because the contractor
     revised logic or scope mid-period.
 
-    Method classification: this is the vendor-equivalent of the SmartPM/Plannex
-    half-step XER generator. The SmartPM half-step itself is not an AACE-canonical
-    method; the closest AACE-canonical analogue is MIP 3.3 contemporaneous
-    split-window observation. CPP cpm-engine v2.2 closes the vendor-tooling gap.
+    Method classification: AACE 29R-03 names this procedure bifurcation,
+    "aka half-stepping or two-stepping" (§2.3.D.2, "Bifurcation: Creating
+    a Progress-Only Half-Step Update"); MIP 3.4 (Observational / Dynamic /
+    Contemporaneous Split) applies it each window, and 3.4.K.4 carries the
+    step-by-step procedure. The SmartPM/Plannex half-step generators are
+    vendor implementations of this canonical procedure; CPP cpm-engine v2.2
+    closes the vendor-tooling gap.
 
     Methodology disclosures
     -----------------------
