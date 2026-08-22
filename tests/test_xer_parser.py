@@ -91,7 +91,19 @@ def test_ermhdr_9_fields():
         raw = data['ermhdr']['raw']
         assert len(raw) == 9, f'Expected 9-field ERMHDR, got {len(raw)}'
         assert raw[0] == 'ERMHDR'
-        assert data['ermhdr']['version'] == '24.12'
+        h = data['ermhdr']
+        # Every decoded slot is asserted. Checking only `raw` and `version`
+        # let a 6-field decoder pass this test while shifting every field
+        # from index 3 on, so `user` reported 'Project' and `currency`
+        # reported the user's name.
+        assert h['version'] == '24.12'
+        assert h['export_date'] == '2026-01-01'
+        assert h['export_flag'] == 'Project'
+        assert h['user'] == 'admin'
+        assert h['user_full_name'] == 'Test User'
+        assert h['database'] == 'dbxDB'
+        assert h['module'] == 'Project Management'
+        assert h['currency'] == 'USD'
     finally:
         os.unlink(path)
 
