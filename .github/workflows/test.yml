@@ -33,3 +33,4 @@ jobs:
         run: |
           python tests/test_xer_parser.py
           python tests/test_half_step.py
+          python tests/test_bundled_validation_runs.py

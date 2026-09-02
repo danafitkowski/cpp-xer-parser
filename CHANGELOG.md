@@ -6,7 +6,25 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ## Unreleased
 
+### Fixed
+
+- **`validate_schedule` and `aace_31r_compliance` now run from a plain clone**, which is what the README has always said they do. Two defects stopped them. First, the optional-import stanza pulled `audit_trail` (which does not ship in this repository) in the same `try` block as `validation` and `config_profiles` (which do), so one missing module discarded the two that were present, and both functions raised `RuntimeError` with their dependencies sitting next to them in `scripts/`. The two import groups are now separate. Second, the bundled `ValidationReport` subset carried `counts()` but not `count(severity)`, which `aace_31r_compliance` calls to score a schedule; `count()` has been added to the subset, which leaves `xer_parser.py` unchanged for the repositories that vendor it. `tests/test_bundled_validation_runs.py` pins both halves and fails against the previous code.
+
 ### Changed
+
+- **README positioning corrected.** The repository previously described itself as "the canonical Primavera P6 XER file parser and generator used by every Critical Path Partners forensic deliverable". It is not: CPP's deliverables are produced with a larger internal parser that adds validation not published here. The README now opens with a Scope section stating plainly what this package is (a standalone parser and generator, complete rather than a demonstration copy) and what it is not, naming the absent capabilities in capability terms: a date-field validation gate, a calendar-decode warning channel, and working-day arithmetic beyond `get_work_days_between` / `duration_hours_to_days`.
+- `SECURITY.md` no longer claims this package "is used in production forensic delay analyses, EOT submissions, and expert-witness reports". It now describes what the package is and records that CPP's own deliverables run additional private validation.
+- Table-reference claim corrected. `references/table-reference.md` documents 40 XER tables, 27 with a field-by-field list and 13 at table level. It previously read "the complete field-by-field reference for all 40+ XER tables".
+- Feature table now shows the real `generate_xer_manifest(data, xer_path=None, **manifest_kwargs)` signature rather than a three-positional-argument form that raises `TypeError`, and records that the manifest needs the unbundled internal audit-trail module while the two validation entry points do not. `validate_schedule` and `aace_31r_compliance` appear in the table for the first time.
+- The P6 24.12 field counts in the README are now published alongside the disagreement the code already documents: `TABLE_FIELD_COUNTS_BY_VERSION` holds one fewer for each of the five tables listed, and the standing `TODO(schema-truth)` records that neither side has been checked against a fresh export. Both are left as they stand and the conflict is disclosed rather than guessed at.
+- Removed the unverifiable marketing line "This closes the flagship gap in the commercial forensic-scheduling tooling market."
+- The module docstring of `scripts/xer_parser.py` no longer calls the file the "Canonical Primavera P6 XER Engine" and the "single source of truth for all XER file operations across all skills".
+
+### Testing
+
+- `pytest tests/` is 22 tests across 4 files, all passing: the existing parser, half-step and citation-guard files plus the new `test_bundled_validation_runs.py`. The CI workflow's direct-invocation step runs the new file as well.
+
+### Changed (earlier, unreleased)
 
 - Validation findings repointed to the correct AACE documents: file-validity and baseline-quality checks now cite AACE 29R-03 §2.1; profile-range checks (WBS depth, activity count) cite the CPP profile with AACE 38R-06 §3.5 (Planning Basis); missing-logic cites AACE 29R-03 §2.1.B.5 / DCMA 14-Point #1. Citations to AACE 31R-03 (a cost-estimate RP, the wrong document for these checks) and 53R-06 pinpoints (that RP has no numbered sections) were removed.
 - Finding `check_id` values renamed from `AACE-31R-03-*` to `XER-*` (`XER-PROJECT-MISSING`, `XER-CALENDAR-MISSING`, `XER-WBS-DEPTH-LOW`, `XER-WBS-DEPTH-HIGH`, `XER-ACTIVITY-COUNT-LOW`, `XER-ACTIVITY-COUNT-HIGH`, `XER-NO-TASKPRED`).

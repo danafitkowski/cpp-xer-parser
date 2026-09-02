@@ -1,6 +1,8 @@
 # Security Policy
 
-`cpp-xer-parser` is used in production forensic delay analyses, EOT submissions, and expert-witness reports. Security defects — particularly any defect that could mislead a court — are treated as release-blocking.
+`cpp-xer-parser` is a parsing and generation library for Primavera P6 XER files, built for forensic-scheduling work. In that setting a defect that silently changes a date, a duration or a relationship becomes a wrong number in a report someone has to defend, so correctness defects of that kind are treated as release-blocking alongside conventional security defects.
+
+To be clear about what this package is: it is the published core, not the whole toolchain Critical Path Partners runs. CPP's own deliverables are produced with additional private validation that is not part of this repository; see the Scope section of the README. A report filed here is a report against the code published here.
 
 Thank you for taking the time to report.
 
@@ -83,9 +85,9 @@ In scope:
 Out of scope:
 
 - Third-party clones, forks, or re-distributions
-- Vendored copies of `xer_parser.py` shipped inside companion repos (those repos have their own security channel; report against the canonical upstream here)
+- Vendored copies of `xer_parser.py` shipped inside companion repos (those repos have their own security channel; this repository is the upstream those copies are vendored from, so report parser defects here)
 - The closed CPP forensic skill suite — these have their own security channel; email `hello@criticalpathpartners.ca` and we will route.
 
 ---
 
-*Last updated: 2026-05-16.*
+*Last updated: 2026-09-02.*
