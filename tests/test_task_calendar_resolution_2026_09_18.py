@@ -6,10 +6,11 @@ task that carries no task-level calendar, while PROJECT.clndr_id correctly
 names the project calendar. That is MS Project's own meaning: no task calendar
 = the project calendar.
 
-Every consumer looked the calendar up as ``cal_map.get(task['clndr_id'])``,
-got None for the blank id, and fell through to whatever its last resort was: a
-continuous seven-day week in the CPM engine, a hard-coded 8 h/day in the
-hours-to-days helpers. Nothing consulted PROJECT.clndr_id, and nothing said so.
+A consumer that looks the calendar up as ``cal_map.get(task['clndr_id'])`` gets
+None for the blank id and falls through to its last resort: 8 h/day in
+``duration_hours_to_days``, without a word, and in cpp-cpm-engine a continuous
+seven-day week, with an ALERT, unless the caller hands it the project
+calendar.
 
 ``resolve_task_calendars`` is the one place the chain now lives:
 
@@ -17,9 +18,9 @@ hours-to-days helpers. Nothing consulted PROJECT.clndr_id, and nothing said so.
                    ->  the CALENDAR row flagged default_flag = 'Y'
                    ->  unresolved, which is REPORTED, never papered over
 
-A blank id that resolves is disclosed (INFO). One that cannot resolve gets the
-same treatment as a calendar that does not decode: a BLOCK finding, because the
-arithmetic downstream then runs on a week the file does not declare.
+A blank id that resolves is disclosed (INFO). One that cannot resolve is a
+BLOCK finding, because the arithmetic downstream then runs on a week the file
+does not declare.
 """
 import os
 import sys
@@ -228,6 +229,8 @@ def test_unresolvable_blank_calendar_is_a_block_finding():
     assert found[0].severity == 'BLOCK'
     assert found[0].evidence['unresolved_count'] == 2
     assert found[0].evidence['task_codes'] == ['A100', 'A200']
+    # names what each consumer falls back to, not one week for all of them
+    assert '8 h/day' in found[0].message and 'seven-day' in found[0].message
 
 
 def test_resolved_fallback_is_disclosed_without_costing_the_score():

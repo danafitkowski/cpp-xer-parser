@@ -2,9 +2,9 @@
 
 ``resolve_task_calendars`` reports on every TASK row in the file. A consumer
 schedules only some of them (one project, no LOE / WBS summaries, ...), and
-what it must disclose is what happened to THOSE activities. This is the one
-builder of that block - the shape cpp-critical-path-validator publishes as
-``calendar_resolution`` - so consumers cannot drift apart on it.
+what it must disclose is what happened to THOSE activities. This builds that
+block - the shape cpp-critical-path-validator publishes as
+``calendar_resolution`` - for consumers to share rather than copy.
 """
 import os
 import sys
