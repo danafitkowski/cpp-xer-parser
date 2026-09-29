@@ -80,6 +80,8 @@ for t in tasks[:3]:
 | Generate XER from dict               | `generate_xer(data, path, p6_version='24.12', currency='CAD', ...)`   |
 | Table accessor                       | `get_table(data, 'TASK')`                                             |
 | Calendar map (with holidays)         | `get_calendar_map(data)`                                              |
+| Activity calendars, blank id = project calendar | `resolve_task_calendars(data)`, `with_resolved_calendars(tasks, resolution)` |
+| Calendar-resolution disclosure block | `calendar_resolution_block(resolution, keep=None)`                    |
 | WBS hierarchy with full paths        | `build_wbs_map(data)`                                                 |
 | Resource assignments per task        | `build_resource_map(data)`                                            |
 | Predecessor / successor maps         | `build_predecessor_map(data)`                                         |
@@ -94,6 +96,31 @@ for t in tasks[:3]:
 | Half-step XER generator (SmartPM-equivalent) | `compute_half_step_xer(base_path, updated_path, output_path)`         |
 
 † `validate_schedule` and `aace_31r_compliance` run from a plain clone: they use the bundled `scripts/validation.py` and `scripts/config_profiles.py`. `generate_xer_manifest` also needs CPP's internal audit-trail module, which is **not** bundled here. Without it the call raises `RuntimeError` rather than returning a manifest with missing provenance. Everything else in the table needs nothing but the standard library.
+
+---
+
+## Blank activity calendar ids
+
+A blank `TASK.clndr_id` means the project calendar, not "no calendar". MPXJ writes it blank for every task of a converted MS Project file that has no task-level calendar. Looked up as it stands, `cal_map.get(task['clndr_id'])` returns `None`, and whatever runs next falls to its last resort: a continuous seven-day week in `cpp-cpm-engine`, 8 h/day in `duration_hours_to_days`. Take the TASK rows through the resolver before looking a calendar up:
+
+```python
+from xer_parser import (get_table, get_calendar_map, duration_hours_to_days,
+                        resolve_task_calendars, with_resolved_calendars)
+
+resolution = resolve_task_calendars(data)
+tasks = with_resolved_calendars(get_table(data, 'TASK'), resolution)
+cal_map = get_calendar_map(data)
+for t in tasks:
+    float_days = duration_hours_to_days(t.get('total_float_hr_cnt'),
+                                        cal_map.get(t.get('clndr_id', '')))
+```
+
+- `resolve_task_calendars` applies the chain `TASK.clndr_id` → `PROJECT.clndr_id` for the row's `proj_id` → the calendar flagged `default_flag = 'Y'`.
+- `with_resolved_calendars` fills only blank ids and returns copies, so the parsed data stays as received.
+- `resolution['unresolved']` lists every row left with no usable calendar: a blank id with nothing to fall back on, or an id the CALENDAR table does not declare, which is reported and never replaced.
+- `validate_schedule` raises a BLOCK `XER-TASK-CALENDAR-UNRESOLVED` for those rows, and an INFO `XER-TASK-CALENDAR-FALLBACK` when blank ids resolved. `generate_summary` converts float on the resolved calendar.
+- A consumer that works on only some of the rows (one project, no LOE or WBS summaries) builds what it discloses with `calendar_resolution_block(resolution, keep=...)`.
+- `get_calendar_map` entries carry the row's `default_flag`.
 
 ---
 
@@ -159,7 +186,7 @@ pip install pytest
 pytest tests/
 ```
 
-`pytest tests/` runs 22 tests across 4 files and they all pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
+`pytest tests/` runs 42 tests across 7 files and they all pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
 
 All tests build their XER fixtures synthetically in memory; no real client XER files ship with the repo.
 
