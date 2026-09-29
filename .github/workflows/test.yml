@@ -34,3 +34,4 @@ jobs:
           python tests/test_xer_parser.py
           python tests/test_half_step.py
           python tests/test_bundled_validation_runs.py
+          python tests/test_report_summary_2026_09_29.py

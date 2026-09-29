@@ -3,7 +3,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![tests](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml)
-[![version: 0.2.0](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
+[![version: 0.2.1](https://img.shields.io/badge/version-0.2.1-blue.svg)](CHANGELOG.md)
 
 A standalone parser and generator for Primavera P6 XER files. Pure Python 3.10+, MIT-licensed, no third-party runtime dependencies.
 
@@ -189,7 +189,7 @@ pip install pytest
 pytest tests/
 ```
 
-`pytest tests/` runs 100 tests across 10 files. 99 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 100 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
+`pytest tests/` runs 109 tests across 11 files. 108 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 109 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
 
 All tests build their XER fixtures synthetically in memory; no real client XER files ship with the repo.
 
@@ -204,7 +204,7 @@ Two consequences worth being explicit about:
 1. **Nothing here is a stub.** The functions in the feature table are the working implementations, and the test suite exercises them. This is a smaller parser, not a demonstration copy.
 2. **If you are auditing a CPP deliverable**, this repository shows you the parsing and generation logic behind it, and the Scope section tells you what else ran that you cannot see here. Ask about the difference rather than inferring it.
 
-`scripts/validation.py` and `scripts/config_profiles.py` are minimal standalone subsets of the same-named modules in the larger internal suite: enough for `validate_schedule` and `aace_31r_compliance` to run end-to-end from a plain clone. `generate_xer_manifest` additionally needs the internal audit-trail module, which is not bundled; see the note under the feature table.
+`scripts/validation.py` and `scripts/config_profiles.py` are minimal standalone subsets of the same-named modules in the larger internal suite: enough for `validate_schedule` and `aace_31r_compliance` to run end-to-end from a plain clone. A report's `to_dict()` carries the internal version's `summary` block, whose `worst_severity` names the worst finding; it also keeps this subset's `counts` key, and lists findings in the order they were added rather than worst first. `generate_xer_manifest` additionally needs the internal audit-trail module, which is not bundled; see the note under the feature table.
 
 ---
 

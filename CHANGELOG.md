@@ -4,6 +4,25 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
+## v0.2.1 — 2026-09-29
+
+The bundled `ValidationReport` serialises with the summary CPP's internal version carries, so a caller can read a report's worst severity from it. Nothing a v0.2.0 caller already reads moves: the change adds a key, a property and an optional argument, and changes no existing value.
+
+**Why a patch.** Before 1.0 this project moves the minor number for a release that changes results a caller already reads, as v0.2.0 did with the list at the top of its notes, and the patch number for a release that only adds. This one only adds, so it is v0.2.1. Code written against v0.2.0 runs unchanged and gets the same values.
+
+### Added
+
+- **`ValidationReport.to_dict()` carries a `summary` block**: `block`, `warn`, `info` and `pass` (the number of findings at each severity), `total`, and `worst_severity`, the worst severity present, ranked BLOCK > WARN > INFO > PASS, and PASS for a report with no findings. These are the keys and values of CPP's internal report, in its order. `cpp-critical-path-validator` reads `summary['worst_severity']` from its embedded DCMA-14 report, and with the bundled subset it found no summary to read.
+- **`ValidationReport.worst_severity`**, the property the summary reads, and **`count()` with no argument**, which returns the number of all findings; `count(severity)` is unchanged. `count`, `worst_severity`, the summary block and the severity ranking are ported from the internal module and are AST-identical to it without docstrings.
+
+  What still differs from the internal report is kept so that no existing output moves: `to_dict()` also carries `counts`, as before, and lists findings in the order they were added, where the internal report sorts them worst first. The module docstring says so. `xer_parser.py` and `config_profiles.py` are unchanged.
+
+### Testing
+
+- `tests/test_report_summary_2026_09_29.py` has 9 tests, all synthetic: the summary's keys, order and values, the severity ranking, the empty report, `count()` with no argument, the unchanged `counts` key and finding order, a JSON round trip, and `validate_schedule` on a file with no logic reporting BLOCK as its worst severity. All 9 fail against v0.2.0's `validation.py`, and each of 7 mutants of the port is killed. CI runs the file under pytest and directly. `pytest tests/` is 109 tests across 11 files: 108 pass and the engine-parity test skips, and all 109 pass with `cpp-cpm-engine`'s `python_reference` directory on `sys.path`.
+
+---
+
 ## v0.2.0 — 2026-09-29
 
 The first release since v0.1.0. Calendar decoding, working-day arithmetic, the XER writer and the schedule summary are brought up to CPP's internal parser. A blank activity calendar id now resolves to the project calendar. `validate_schedule` and `aace_31r_compliance` run from a plain clone. The README, `SECURITY.md` and the table reference say what the code does.
