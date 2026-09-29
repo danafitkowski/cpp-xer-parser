@@ -19,7 +19,7 @@ Companion to [`cpp-cpm-engine`](https://github.com/danafitkowski/cpp-cpm-engine)
 **What this is not.** It is not the whole toolchain Critical Path Partners runs. CPP's forensic deliverables are produced with additional validation that is kept private and is not part of this package. Named in capability terms, this package does not include:
 
 - **A date-field validation gate.** Date fields are parsed as they appear. There is no pass that flags unparseable or implausible date values before downstream math consumes them.
-- **A calendar-decode warning channel.** `parse_calendar_data` decodes the standard P6 encoding and then falls through two legacy patterns. When all of them fail it returns an empty work week rather than raising or warning, and a corrupt calendar record is not reported to the caller. Code that needs that signal has to inspect the returned structure itself.
+- **A calendar-decode warning channel.** `parse_calendar_data` decodes the standard P6 encoding, with time slots in either of the two field orders P6 writes, and then falls through two legacy patterns. When all of them fail it returns an empty work week rather than raising or warning, and the working-day helpers then count that calendar as Mon-Fri. Code that needs that signal has to inspect the returned structure itself. A corrupt calendar record is not reported to the caller either: a record P6 cannot bind (finish-first time slots under an illegal `clndr_type`) is decoded here as the week it declares, while P6 schedules its activities on its default Standard calendar, which is what `cpp-cpm-engine`'s calendar decoder does too.
 - **Working-day arithmetic beyond `get_work_days_between` and `duration_hours_to_days`.** The additional working-day delta helper in CPP's internal parser is not included here.
 
 None of that makes this parser wrong. It makes it smaller. If you are comparing output from this package against a report CPP produced, the difference in validation surface is the thing to ask about, and the answer is in this section rather than in a footnote.
@@ -153,19 +153,21 @@ print(f"Activities removed in updated (preserved in output): {result['unmatched_
 
 The generator emits P6-importable XER files following these rules:
 
-1. **Table order**: CURRTYPE, FINTMPL, OBS, PROJECT, CALENDAR, SCHEDOPTIONS, PROJWBS, TASK, TASKPRED, then remaining tables. See the `TABLE_ORDER` constant.
-2. **ERMHDR line**: `ERMHDR\t24.12\t<export_date>\tProject Management\tCAD` (or supplied currency).
+1. **Table order**: CURRTYPE, FINTMPL, OBS, PROJECT, CALENDAR, SCHEDOPTIONS, PROJWBS, TASK, TASKPRED, then remaining tables. See the `TABLE_ORDER` constant. This is a generation order that P6 imports cleanly, not an order real exports obey: the 166 exports measured for `references/table-reference.md` produced 38 distinct `%T` sequences (see its Export order section). When parsing, never assume an order.
+2. **ERMHDR line**: nine tab-separated fields, `ERMHDR\t24.12\t<export_date>\t<export_scope>\t<user>\t<user_full_name>\t<database>\tProject Management\t<currency>`. A header read from a parsed file is written back as it was read; otherwise it is built from the `generate_xer` keyword arguments.
 3. **Field counts**: every `%R` row must have exactly the same number of fields as the `%F` definition that precedes it. The generator enforces this.
-4. **Known field counts for P6 24.12**:
-   - PROJECT: 72 fields
-   - SCHEDOPTIONS: 26 fields
-   - PROJWBS: 27 fields
-   - TASK: 62 fields (includes `crt_path_num`)
-   - TASKPRED: 12 fields (includes `comments`, `aref`, `arls`)
+4. **Known field counts for P6 23.10, 23.12 and 24.12**, measured across the 163 genuine exports at those versions behind `references/table-reference.md`, and held in `TABLE_FIELD_COUNTS_BY_VERSION`:
+   - PROJECT: 71 fields
+   - SCHEDOPTIONS: 25 fields
+   - PROJWBS: 26 fields
+   - TASK: 61 fields (`crt_path_num` is the 61st, at 24.12 as at 23.x)
+   - TASKPRED: 11 fields
 
-   **Open question, disclosed rather than resolved.** The parser's own version-aware validation constant (`TABLE_FIELD_COUNTS_BY_VERSION`) holds one fewer for every table in that list: PROJECT 71, SCHEDOPTIONS 25, PROJWBS 26, TASK 61, TASKPRED 11. A file matching the numbers above therefore draws an `XER-FIELD-COUNT` warning from `validate_schedule`. The code carries a standing `TODO(schema-truth)` saying the same thing. Both sets have plausible lineage, neither has been re-checked against a fresh P6 24.12 export, and guessing would silently change validation behaviour for every consumer, so both are left as they stand and the conflict is stated here instead. If a field count matters to your work, verify it against your own export.
-5. **Encoding**: ASCII with CRLF line endings by default. Pass `encoding='cp1252'` for strict legacy P6 compatibility with non-ASCII text.
+   No export gave a different count for a table it carried, and the 50 genuine 24.12 exports match 23.12 on all five. Earlier versions of this README gave 72, 26, 27, 62 and 12 and called the difference from the constant an open question; the measurement settles it in the constant's favour. 19.12 is a different layout (PROJECT 82, TASK 66, TASKPRED 10). Counts are a sanity check, not a parsing contract: index fields by name from the `%F` line, never by position.
+5. **Encoding**: UTF-8 with CRLF line endings by default. Pass `encoding='cp1252'` for strict legacy P6 compatibility with non-ASCII text.
 6. **Calendar data**: when generating from scratch, copy the `clndr_data` field verbatim from a working reference XER. Re-encoding is brittle.
+7. **End-of-file marker**: the file ends with a `%E` line, as genuine P6 exports do. The parser skips it, so it never becomes a table and does not multiply on a round trip.
+8. **Cell values**: a tab, CR or LF inside a value would add a column or split a row, so each run of them is written as one space. Genuine P6 data never carries them.
 
 See `references/table-reference.md` for the table reference: 40 XER tables, 27 of them with a field-by-field list, and 13 less common ones (documents, roles, shifts, resource codes, risk) described at table level rather than field level.
 
@@ -186,7 +188,7 @@ pip install pytest
 pytest tests/
 ```
 
-`pytest tests/` runs 42 tests across 7 files and they all pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
+`pytest tests/` runs 100 tests across 10 files. 99 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 100 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
 
 All tests build their XER fixtures synthetically in memory; no real client XER files ship with the repo.
 
