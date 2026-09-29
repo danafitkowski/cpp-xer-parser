@@ -23,6 +23,7 @@ Usage:
 
 import sys
 import json
+import math
 import os
 import re
 from datetime import datetime, timedelta
@@ -889,62 +890,120 @@ def calendar_resolution_block(resolution, keep=None):
     }
 
 
+def _calendar_day(d):
+    """The calendar day of a date, datetime or 'YYYY-MM-DD[ HH:MM]' string, as
+    a datetime at midnight; None when it cannot be read.
+
+    Every working-day count in this module is a count of DAYS, and a P6 date
+    carries a clock time. Before v0.2.0 the time was stripped from string
+    inputs only: a datetime whose clock time was earlier than the start's was
+    never reached by a walk in whole days from the start instant, so Friday
+    17:00 to Monday 08:00 counted Friday alone, and a date could not be
+    compared with a datetime at all.
+    """
+    if isinstance(d, str):
+        try:
+            return datetime.strptime(d[:10], '%Y-%m-%d')
+        except (ValueError, TypeError):
+            return None
+    if isinstance(d, datetime):
+        return d.replace(hour=0, minute=0, second=0, microsecond=0)
+    if hasattr(d, 'year') and hasattr(d, 'month') and hasattr(d, 'day'):
+        return datetime(d.year, d.month, d.day)
+    return None
+
+
 def get_work_days_between(start_date, end_date, calendar_info=None):
     """
     Calculate work days between two dates using calendar info.
     Accounts for work week pattern and holiday exceptions.
     If calendar_info is None or empty, defaults to Mon-Fri with no holidays.
+    Both dates are read on their calendar day, so the count includes both
+    endpoint days whatever their clock times.
     """
     if not start_date or not end_date:
         return None
 
-    try:
-        if isinstance(start_date, str):
-            start = datetime.strptime(start_date[:10], '%Y-%m-%d')
-        else:
-            start = start_date
-        if isinstance(end_date, str):
-            end = datetime.strptime(end_date[:10], '%Y-%m-%d')
-        else:
-            end = end_date
-    except (ValueError, TypeError):
+    start = _calendar_day(start_date)
+    end = _calendar_day(end_date)
+    if start is None or end is None:
         return None
 
     # Default to Mon-Fri in P6 weekday scheme (0=Sun, 1=Mon...6=Sat)
     if calendar_info is None:
         work_days = [1, 2, 3, 4, 5]
         holidays = set()
+        special_workdays = set()
     else:
         work_days = calendar_info.get('work_days') or [1, 2, 3, 4, 5]
         holidays = set(calendar_info.get('holidays') or [])
+        special_workdays = set(calendar_info.get('special_workdays') or [])
+
+    # A span beyond ~100 years is not a real schedule window — a garbled or
+    # sentinel date (e.g. a 9999 finish) reached this function. Refuse to compute
+    # and return None (like missing/unparsable dates) rather than loop for
+    # millions of days or return a plausible-but-wrong count.
+    MAX_SPAN_DAYS = 366 * 100
+    if (end - start).days > MAX_SPAN_DAYS:
+        return None
 
     count = 0
     current = start
     while current <= end:
-        day_of_week = current.weekday()
-        # Python weekday: Mon=0..Sun=6; P6 work_days uses Sun=0..Sat=6
-        # Convert: Python Mon=0 → P6 index 1, Python Sun=6 → P6 index 0
-        p6_day = (day_of_week + 1) % 7
-        date_str = current.strftime('%Y-%m-%d')
-
-        if p6_day in work_days and date_str not in holidays:
+        # Single source of truth for working-day status, so forced-ON
+        # (special_workdays) and forced-OFF (holidays) exceptions are honored.
+        if _is_work_day(current, work_days, holidays, special_workdays):
             count += 1
-
         current += timedelta(days=1)
 
     return count
 
 
-def _is_work_day(dt, work_days, holidays):
+def _is_work_day(dt, work_days, holidays, special_workdays=None):
     """True if dt (date/datetime) is a working day on the given calendar.
 
     work_days: list of P6 weekday indices (0=Sun, 1=Mon, ..., 6=Sat).
-    holidays: iterable of 'YYYY-MM-DD' exception date strings (non-working).
+    holidays: iterable of 'YYYY-MM-DD' exception date strings (forced OFF —
+        non-working even when the weekday is normally worked, e.g. a stat day).
+    special_workdays: iterable of 'YYYY-MM-DD' exception date strings (forced
+        ON — worked even when the weekday is normally non-working, e.g. a worked
+        Saturday). Optional for backward compatibility; default = none.
+
+    Exception precedence: an explicit holiday wins (the day is off), then an
+    explicit special workday (the day is on), otherwise the weekly pattern.
     """
+    date_str = dt.strftime('%Y-%m-%d')
+    if date_str in holidays:
+        return False
+    if special_workdays and date_str in special_workdays:
+        return True
     day_of_week = dt.weekday()  # Python: Mon=0..Sun=6
     p6_day = (day_of_week + 1) % 7  # Python Mon=0 → P6 1 ; Python Sun=6 → P6 0
-    date_str = dt.strftime('%Y-%m-%d')
-    return (p6_day in work_days) and (date_str not in holidays)
+    return p6_day in work_days
+
+
+def _round_half_up(x):
+    """Return floor(x + 0.5) as int — HALF-UP, not banker's rounding.
+
+    Mirrors ``_round_half_up`` in cpp-cpm-engine's Python reference
+    (python_reference/cpm.py) and ``_roundHalfUp`` in cpm-engine.js, so the
+    same fractional duration resolves to the same whole workday count here and
+    in the engine.
+
+    Before v0.2.0 this module used ``int(round(x))``, which is Python's
+    round-half-to-even: round(0.5) = 0 and round(2.5) = 2, while the engine
+    returns 1 and 3. On a Mon-Fri calendar from Mon 2026-08-17,
+    add_work_days(..., 0.5) answered 2026-08-17 here and 2026-08-18 in the
+    engine. Durations and lags of exactly half a day are common in real
+    exports, and every one of them resolved a working day differently
+    depending on which module handled it.
+    """
+    if x is None:
+        return 0
+    try:
+        return int(math.floor(float(x) + 0.5))
+    except (TypeError, ValueError):
+        return 0
 
 
 def add_work_days(start_date, n_workdays, calendar_info=None):
@@ -955,21 +1014,35 @@ def add_work_days(start_date, n_workdays, calendar_info=None):
     and exception holidays (``calendar_info['holidays']``), counting only actual
     work days. Returns when ``n_workdays`` working days have been consumed.
 
-    This is the inverse of ``get_work_days_between`` and drives calendar-aware
-    CPM forward-pass arithmetic: a 5-workday task on a Mon-Fri calendar starting
-    on Monday finishes Friday — NOT Saturday (the ordinal-arithmetic bug that
-    silently wrecked every TIA on a non-7-day calendar).
+    GAP SEMANTICS, not occupancy. The result is the date N working days AFTER
+    the anchor; the anchor day itself is not one of the N. On a Mon-Fri
+    calendar, ``add_work_days(Mon, 5)`` is the FOLLOWING Monday, and
+    ``add_work_days(Mon, 4)`` is Friday. So a task of D working days starting
+    on ES finishes on::
+
+        EF = add_work_days(ES, D - 1)
+
+    (Before v0.2.0 this docstring claimed the opposite — 'a 5-workday task on a
+    Mon-Fri calendar starting on Monday finishes Friday' — which is what
+    ``add_work_days(Mon, 4)`` returns, not ``add_work_days(Mon, 5)``:
+    add_work_days('2026-08-17' Mon, 5) = 2026-08-24 Mon;
+    add_work_days('2026-08-17', 4) = 2026-08-21 Fri. A caller that followed
+    the old docstring and wrote ``finish = add_work_days(start, duration)``
+    landed one working day late on every activity.)
 
     Args:
         start_date: 'YYYY-MM-DD' string OR datetime/date object.
-        n_workdays: float or int — fractional workdays are rounded to the nearest
-            whole workday count internally (P6 CPM works on whole-day nodes).
+        n_workdays: float or int — fractional workdays are rounded to a whole
+            workday count internally, HALF-UP (0.5 → 1, 2.5 → 3), matching
+            cpp-cpm-engine. P6 CPM works on whole-day nodes.
         calendar_info: dict from get_calendar_map(). None → Mon-Fri, no holidays.
 
     Returns:
         A ``date`` object N working days after start_date. ``n_workdays == 0``
-        returns start_date unchanged. Negative ``n_workdays`` delegates to
-        ``subtract_work_days`` for symmetry.
+        SNAPS a non-working anchor FORWARD to the next working day (and leaves
+        a working anchor alone); ``subtract_work_days(d, 0)`` snaps backward,
+        so add-0 followed by subtract-0 is not the identity. Negative
+        ``n_workdays`` delegates to ``subtract_work_days`` for symmetry.
 
     Raises:
         ValueError if start_date cannot be parsed.
@@ -977,7 +1050,7 @@ def add_work_days(start_date, n_workdays, calendar_info=None):
     if n_workdays is None:
         n_workdays = 0
     try:
-        n = int(round(float(n_workdays)))
+        n = _round_half_up(float(n_workdays))
     except (TypeError, ValueError):
         n = 0
     if n < 0:
@@ -994,28 +1067,40 @@ def add_work_days(start_date, n_workdays, calendar_info=None):
     else:
         current = start_date  # assume date-like
 
-    if n == 0:
-        return current
-
     if calendar_info is None:
         work_days = [1, 2, 3, 4, 5]
         holidays = set()
+        special_workdays = set()
     else:
         work_days = calendar_info.get('work_days') or [1, 2, 3, 4, 5]
         holidays = set(calendar_info.get('holidays') or [])
+        special_workdays = set(calendar_info.get('special_workdays') or [])
 
     # Guard: a calendar with zero working days would loop forever.
     if not work_days:
         return current
 
-    # P6 CPM convention: EF = ES + duration means the task occupies N work days
-    # (NOT N gaps). We step one day per iteration and decrement `remaining`
-    # whenever we land on a work day. The final decrement lands us on the EF
-    # date — i.e. the date of work day N.
+    if n == 0:
+        # Zero-day snap, matching cpp-cpm-engine (add_work_days in its Python
+        # reference, addWorkDays in cpm-engine.js): a non-working anchor moves
+        # FORWARD to the next working day. This module used to return the
+        # anchor unchanged, so the identical call on the identical calendar
+        # answered two different dates depending on which module the caller
+        # reached; on a calendar carrying a long run of exception days the two
+        # answers can be months apart.
+        while not _is_work_day(current, work_days, holidays, special_workdays):
+            current += timedelta(days=1)
+        return current
+
+    # Walks N GAPS: `remaining` decrements once per working day LANDED ON after
+    # the anchor, so the anchor day is not counted. EF for a D-day task is
+    # therefore add_work_days(ES, D - 1). (This comment used to assert the
+    # opposite — 'the task occupies N work days (NOT N gaps)' — which the code
+    # has never done; see the docstring.)
     remaining = n
     while remaining > 0:
         current += timedelta(days=1)
-        if _is_work_day(current, work_days, holidays):
+        if _is_work_day(current, work_days, holidays, special_workdays):
             remaining -= 1
     return current
 
@@ -1024,15 +1109,22 @@ def subtract_work_days(end_date, n_workdays, calendar_info=None):
     """Walk backwards N working days from ``end_date`` on the given calendar.
 
     Used by the CPM backward pass: LS = LF - duration on the activity's calendar.
-    A 5-workday task finishing Friday starts Monday (not the prior Sunday).
 
-    Same arg conventions as ``add_work_days``. Negative ``n_workdays`` delegates
-    forward (inverse symmetry).
+    GAP SEMANTICS, mirroring ``add_work_days``: the result is the date N
+    working days BEFORE the anchor, which is not itself counted. On a Mon-Fri
+    calendar a task of D working days finishing on LF starts on
+    ``subtract_work_days(LF, D - 1)`` — a 5-day task finishing Friday starts
+    Monday, which is ``subtract_work_days(Fri, 4)``.
+
+    Same arg conventions as ``add_work_days`` (half-up rounding of fractional
+    workdays). ``n_workdays == 0`` snaps a non-working anchor BACKWARD to the
+    prior working day. Negative ``n_workdays`` delegates forward (inverse
+    symmetry).
     """
     if n_workdays is None:
         n_workdays = 0
     try:
-        n = int(round(float(n_workdays)))
+        n = _round_half_up(float(n_workdays))
     except (TypeError, ValueError):
         n = 0
     if n < 0:
@@ -1048,23 +1140,30 @@ def subtract_work_days(end_date, n_workdays, calendar_info=None):
     else:
         current = end_date
 
-    if n == 0:
-        return current
-
     if calendar_info is None:
         work_days = [1, 2, 3, 4, 5]
         holidays = set()
+        special_workdays = set()
     else:
         work_days = calendar_info.get('work_days') or [1, 2, 3, 4, 5]
         holidays = set(calendar_info.get('holidays') or [])
+        special_workdays = set(calendar_info.get('special_workdays') or [])
 
     if not work_days:
+        return current
+
+    if n == 0:
+        # Symmetric to add_work_days: matches cpp-cpm-engine's
+        # subtract_work_days / subtractWorkDays, which snap a non-working
+        # anchor BACKWARD to the prior working day.
+        while not _is_work_day(current, work_days, holidays, special_workdays):
+            current -= timedelta(days=1)
         return current
 
     remaining = n
     while remaining > 0:
         current -= timedelta(days=1)
-        if _is_work_day(current, work_days, holidays):
+        if _is_work_day(current, work_days, holidays, special_workdays):
             remaining -= 1
     return current
 
