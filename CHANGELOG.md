@@ -4,9 +4,11 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
-## Unreleased
+## v0.2.1 — 2026-09-29
 
 The bundled `ValidationReport` serialises with the summary CPP's internal version carries, so a caller can read a report's worst severity from it. Nothing a v0.2.0 caller already reads moves: the change adds a key, a property and an optional argument, and changes no existing value.
+
+**Why a patch.** Before 1.0 this project moves the minor number for a release that changes results a caller already reads, as v0.2.0 did with the list at the top of its notes, and the patch number for a release that only adds. This one only adds, so it is v0.2.1. Code written against v0.2.0 runs unchanged and gets the same values.
 
 ### Added
 

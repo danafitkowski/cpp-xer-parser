@@ -3,7 +3,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![tests](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml)
-[![version: 0.2.0](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
+[![version: 0.2.1](https://img.shields.io/badge/version-0.2.1-blue.svg)](CHANGELOG.md)
 
 A standalone parser and generator for Primavera P6 XER files. Pure Python 3.10+, MIT-licensed, no third-party runtime dependencies.
 
