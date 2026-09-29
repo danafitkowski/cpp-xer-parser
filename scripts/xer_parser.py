@@ -127,7 +127,27 @@ __all__ = [
 # CONSTANTS
 # ─────────────────────────────────────────────
 
-# P6 24.12 canonical table order for XER generation
+# Generation order for writing an XER. This is the sequence `generate_xer` emits
+# tables in, and P6 imports it cleanly. It is NOT a canonical export order: there
+# is no such thing. The 166 genuine exports measured for
+# references/table-reference.md produced 38 distinct %T sequences, and the first
+# nine names below are only the most common of them, appearing in 28 of 166.
+# Definition tables such as UDFTYPE, MEMOTYPE and PCATTYPE routinely appear before
+# PROJECT in real files. Never parse on the assumption of any order: read every
+# %T block into a table map first, then resolve cross-references.
+#
+# Names below are %T headers. 29 of the 39 appear in the measured set; the other
+# 10 (TASKFIN, TRSRCFIN, TASKDOC, PROJDOCS, SHIFT, SHIFTPER, ACCOUNT, WBSMEMO,
+# PROJMEMO, RISK) are P6 catalogue names that appear in none of the 166 exports,
+# kept so a file carrying one lands in a sensible slot. Three tables that DO
+# appear in the measured set are absent from this list on purpose — NONWORK,
+# RSRCCURVDATA and WBSSTEP — and are written in the trailing "everything else"
+# pass, which is harmless because P6 imports on content, not order.
+#
+# The resource-code assignment table is RSRCRCAT. No measured export writes a
+# `RSRCCAT` header, so code keyed on that spelling never fires (corrected in
+# v0.2.0, along with the removal of a phantom `RISKTYPES` entry that
+# duplicated RISKTYPE and matches no P6 table).
 TABLE_ORDER = [
     'CURRTYPE', 'FINTMPL', 'OBS', 'PROJECT', 'CALENDAR',
     'SCHEDOPTIONS', 'PROJWBS', 'TASK', 'TASKPRED', 'TASKRSRC',
@@ -135,8 +155,8 @@ TABLE_ORDER = [
     'UDFTYPE', 'UDFVALUE', 'PROJPCAT', 'PCATTYPE', 'PCATVAL',
     'TASKFIN', 'TRSRCFIN', 'TASKDOC', 'PROJDOCS', 'ROLERATE',
     'ROLES', 'RSRCROLE', 'SHIFT', 'SHIFTPER', 'ACCOUNT',
-    'RCATTYPE', 'RCATVAL', 'RSRCCAT', 'MEMOTYPE', 'TASKMEMO',
-    'WBSMEMO', 'PROJMEMO', 'RISKTYPE', 'RISK', 'RISKTYPES'
+    'RCATTYPE', 'RCATVAL', 'RSRCRCAT', 'MEMOTYPE', 'TASKMEMO',
+    'WBSMEMO', 'PROJMEMO', 'RISKTYPE', 'RISK'
 ]
 
 # Known field counts per table, keyed by P6 schema family.
@@ -381,7 +401,13 @@ def parse_xer(filepath, encoding=None):
 
             record = {}
             for i, field in enumerate(current_fields):
-                record[field] = values[i] if i < len(values) else ''
+                record[field] = values[i]
+            # Preserve cells beyond the declared fields under synthetic string
+            # keys rather than silently dropping them (never-truncate). Only
+            # fires on a malformed/hand-edited row with extra tabs; values stay
+            # strings (the passthrough contract).
+            for i in range(len(current_fields), len(values)):
+                record[f'__extra_{i}'] = values[i]
 
             result['tables'][current_table]['records'].append(record)
             continue
@@ -1397,6 +1423,13 @@ def generate_summary(data):
     real_tasks = [t for t in tasks if t.get('task_type', '') not in ('TT_LOE', 'TT_WBS')]
     milestones = [t for t in real_tasks if t.get('task_type', '') in ('TT_Mile', 'TT_FinMile')]
 
+    # Work activities = real tasks minus zero-duration milestone markers. A
+    # count-based percent_complete that includes milestones overstates progress
+    # on milestone-heavy schedules, so we also report a work-only completion.
+    work_tasks = [t for t in real_tasks if t.get('task_type', '') not in MILESTONE_TASK_TYPES]
+    work_total = len(work_tasks)
+    complete_work = len([t for t in work_tasks if t.get('status_code', '') == 'TK_Complete'])
+
     total = len(real_tasks)
     complete = len([t for t in real_tasks if t.get('status_code', '') == 'TK_Complete'])
     in_progress = len([t for t in real_tasks if t.get('status_code', '') == 'TK_Active'])
@@ -1405,11 +1438,15 @@ def generate_summary(data):
     summary['schedule_metrics'] = {
         'total_activities': total,
         'total_including_loe': len(tasks),
-        'loe_count': len(tasks) - len(real_tasks),
+        'loe_count': len([t for t in tasks if t.get('task_type', '') == 'TT_LOE']),
+        'wbs_count': len([t for t in tasks if t.get('task_type', '') == 'TT_WBS']),
         'complete': complete,
         'in_progress': in_progress,
         'not_started': not_started,
         'percent_complete': round((complete / total * 100), 1) if total > 0 else 0,
+        'work_task_count': work_total,
+        'complete_work': complete_work,
+        'percent_complete_work': round((complete_work / work_total * 100), 1) if work_total > 0 else 0,
         'milestone_count': len(milestones),
         'milestones_complete': len([m for m in milestones if m.get('status_code') == 'TK_Complete']),
         'milestones_remaining': len([m for m in milestones if m.get('status_code') != 'TK_Complete']),
@@ -1452,10 +1489,8 @@ def generate_summary(data):
                 'early_start': t.get('early_start_date', ''),
                 'early_finish': t.get('early_end_date', ''),
             }
-            for t in critical_by_float[:50]  # Cap the summary list
+            for t in critical_by_float
         ],
-        'note': '(Showing first 50 critical activities in summary. Full list available via get_table.)'
-            if len(critical_by_float) > 50 else '',
     }
 
     # Float distribution — uses per-activity calendar hours, not hardcoded 8hr
@@ -1680,8 +1715,9 @@ def print_summary(data, output_file=None):
     lines.append('─' * 40)
     lines.append('SCHEDULE METRICS')
     lines.append('─' * 40)
-    lines.append(f"  Total Activities:     {sm['total_activities']} (excl. {sm['loe_count']} LOE)")
-    lines.append(f"  Complete:             {sm['complete']} ({sm['percent_complete']}%)")
+    lines.append(f"  Total Activities:     {sm['total_activities']} (excl. {sm['loe_count']} LOE, {sm['wbs_count']} WBS summary)")
+    lines.append(f"  Complete:             {sm['complete']} ({sm['percent_complete']}% of all activities)")
+    lines.append(f"  Work-task completion: {sm['complete_work']}/{sm['work_task_count']} ({sm['percent_complete_work']}%, excl. milestones)")
     lines.append(f"  In Progress:          {sm['in_progress']}")
     lines.append(f"  Not Started:          {sm['not_started']}")
     lines.append(f"  Milestones:           {sm['milestone_count']} ({sm['milestones_complete']} hit, {sm['milestones_remaining']} remaining)")
@@ -1755,7 +1791,7 @@ def print_summary(data, output_file=None):
         lines.append(f"  Field Validation:       {fv}")
     else:
         lines.append(f"  Field Validation:       {len(fv)} issues found")
-        for issue in fv[:10]:
+        for issue in fv:
             lines.append(f"    - {issue}")
     lines.append('')
     lines.append('=' * 70)
@@ -2096,7 +2132,7 @@ def validate_schedule(data, profile='commercial', subject=None):
         report.add(Finding(
             severity=INFO,
             check_id='XER-FIELD-COUNT-SKIPPED',
-            message=f'P6 version {version!r} not in schema map — field-count check skipped',
+            message=f'P6 version {version!r} not in schema map. Field-count check skipped.',
             evidence={'p6_version': version},
             reference='P6 XER schema (field counts by version)',
         ))
@@ -2107,7 +2143,7 @@ def validate_schedule(data, profile='commercial', subject=None):
         report.add(Finding(
             severity=BLOCK,
             check_id='XER-PROJECT-MISSING',
-            message='No PROJECT records found in the XER — file is not a valid schedule',
+            message='No PROJECT records found in the XER. File is not a valid schedule.',
             evidence={'project_count': 0},
             reference='AACE 29R-03 §2.1 (baseline schedule validation)',
         ))
@@ -2115,7 +2151,7 @@ def validate_schedule(data, profile='commercial', subject=None):
         report.add(Finding(
             severity=INFO,
             check_id='XER-MULTI-PROJECT',
-            message=f'Multi-project XER — {len(projects)} PROJECT records found',
+            message=f'Multi-project XER: {len(projects)} PROJECT records found',
             evidence={'project_count': len(projects),
                       'project_ids': [p.get('proj_id', '') for p in projects]},
             reference='P6 XER structure (multi-project export)',
@@ -2127,7 +2163,7 @@ def validate_schedule(data, profile='commercial', subject=None):
         report.add(Finding(
             severity=BLOCK,
             check_id='XER-CALENDAR-MISSING',
-            message='No CALENDAR records found in the XER — activity durations cannot be computed',
+            message='No CALENDAR records found in the XER. Activity durations cannot be computed.',
             evidence={'calendar_count': 0},
             reference='AACE 29R-03 §2.1.B.10 (calendar validation)',
         ))
@@ -2201,7 +2237,7 @@ def validate_schedule(data, profile='commercial', subject=None):
             report.add(Finding(
                 severity=BLOCK,
                 check_id='XER-WBS-DEPTH-LOW',
-                message=f'WBS is too shallow — max depth {max_wbs_depth} < {wbs_min} ({profile} profile minimum)',
+                message=f'WBS is too shallow: max depth {max_wbs_depth} < {wbs_min} ({profile} profile minimum)',
                 evidence={'max_wbs_depth': max_wbs_depth, 'min_required': wbs_min, 'profile': profile},
                 reference='CPP profile heuristic / AACE 38R-06 §3.5 (Planning Basis)',
             ))
@@ -2209,7 +2245,7 @@ def validate_schedule(data, profile='commercial', subject=None):
             report.add(Finding(
                 severity=WARN,
                 check_id='XER-WBS-DEPTH-HIGH',
-                message=f'WBS is unusually deep — max depth {max_wbs_depth} > {wbs_max} ({profile} profile maximum)',
+                message=f'WBS is unusually deep: max depth {max_wbs_depth} > {wbs_max} ({profile} profile maximum)',
                 evidence={'max_wbs_depth': max_wbs_depth, 'max_allowed': wbs_max, 'profile': profile},
                 reference='CPP profile heuristic / AACE 38R-06 §3.5 (Planning Basis)',
             ))
@@ -2266,7 +2302,7 @@ def validate_schedule(data, profile='commercial', subject=None):
             check_id='XER-NO-TASKPRED',
             message=(
                 f'Schedule has {len(non_summary_tasks)} non-summary, non-milestone '
-                f'activities but zero TASKPRED relationships tie any of them — no work logic exists'
+                f'activities but zero TASKPRED relationships tie any of them. No work logic exists.'
             ),
             evidence={
                 'non_summary_task_count': len(non_summary_tasks),
@@ -2386,7 +2422,10 @@ def generate_xer(data, output_path, p6_version='24.12', currency='CAD',
     When an 'ermhdr' block is present in `data` it is preserved verbatim.
     Otherwise the 9-field P6 header is synthesised from the kwargs.
 
-    Tables are written in P6 24.12 canonical order with CRLF line endings.
+    Tables are written in TABLE_ORDER, then any table not named there, with CRLF
+    line endings. TABLE_ORDER is a generation order that P6 imports cleanly, not
+    a canonical export order: real exports use no single order (38 distinct %T
+    sequences across the 166 measured). See the TABLE_ORDER comment.
     Encoding defaults to utf-8 (pass 'cp1252' for strict legacy P6 compatibility).
     """
     lines = []
@@ -2397,26 +2436,26 @@ def generate_xer(data, output_path, p6_version='24.12', currency='CAD',
     # on version. Preserve whatever the source had.
     raw_ermhdr = data.get('ermhdr', {}).get('raw')
     if raw_ermhdr and isinstance(raw_ermhdr, list) and len(raw_ermhdr) >= 5:
-        lines.append('\t'.join(raw_ermhdr))
+        lines.append('\t'.join(_sanitize_cell(p) for p in raw_ermhdr))
     else:
         export_date = datetime.now().strftime(P6_DATE_FORMAT)
         ermhdr_parts = [
             'ERMHDR', p6_version, export_date, export_scope,
             user, user_full_name, database, module, currency,
         ]
-        lines.append('\t'.join(ermhdr_parts))
+        lines.append('\t'.join(_sanitize_cell(p) for p in ermhdr_parts))
 
-    # Write tables in canonical order
+    # Write tables in TABLE_ORDER (a generation order, not a canonical one)
     tables = data.get('tables', {})
 
-    # First write tables in canonical order, then any remaining
+    # First the tables TABLE_ORDER names, then any remaining
     written = set()
     for table_name in TABLE_ORDER:
         if table_name in tables:
             _write_table(lines, table_name, tables[table_name])
             written.add(table_name)
 
-    # Any remaining tables not in canonical order
+    # Any remaining tables TABLE_ORDER does not name
     for table_name in tables:
         if table_name not in written:
             _write_table(lines, table_name, tables[table_name])
@@ -2440,15 +2479,43 @@ def generate_xer(data, output_path, p6_version='24.12', currency='CAD',
     return output_path
 
 
+def _sanitize_cell(value):
+    """Collapse embedded TSV delimiters (tab / CR / LF) in a cell value.
+
+    XER is tab-delimited and newline-terminated. A field value that itself
+    contains a raw tab injects a phantom column; one containing a newline
+    splits the row — silently corrupting the file and scrambling later columns
+    (e.g. status_code reading as the tail of a task_name). The field-COUNT
+    assertion in _write_table cannot catch this: the values list length is
+    still correct before the tab-join. We collapse any \\t / \\r / \\n run
+    to a single space.
+
+    Real P6 exports never carry raw delimiters in values, so this is a no-op on
+    genuine schedules; it only neutralizes programmatically-built data —
+    half-step generation, hand-built models, multi-line memo text — that would
+    otherwise emit a malformed XER.
+    """
+    if value is None:
+        return ''
+    s = value if isinstance(value, str) else str(value)
+    if '\t' in s or '\n' in s or '\r' in s:
+        s = re.sub(r'[\t\r\n]+', ' ', s)
+    return s
+
+
 def _write_table(lines, table_name, table_data):
     """Write a single table's %T, %F, and %R lines.
 
     Asserts row/field-count parity per row before emitting %R — a mismatch
-    causes a blank import grid in P6 (see SKILL.md §3). Because each value
-    is sourced by .get(field, '') against the canonical fields list, the two
-    counts can only diverge if the fields list itself is empty/None or
-    mutated mid-loop, but the explicit assertion makes the contract loud and
-    fails fast instead of producing a silently broken XER.
+    causes a blank import grid in P6 (see the README, "XER generation rules").
+    Because each value is sourced by .get(field, '') against the canonical
+    fields list, the two counts can only diverge if the fields list itself is
+    empty/None or mutated mid-loop, but the explicit assertion makes the
+    contract loud and fails fast instead of producing a silently broken XER.
+
+    Every emitted token (table name, field names, cell values) is run through
+    _sanitize_cell so an embedded tab/newline in any value cannot break the
+    row/column framing.
     """
     fields = table_data.get('fields', [])
     records = table_data.get('records', [])
@@ -2457,19 +2524,16 @@ def _write_table(lines, table_name, table_data):
         return
 
     # %T line
-    lines.append(f'%T\t{table_name}')
+    lines.append(f'%T\t{_sanitize_cell(table_name)}')
 
     # %F line
-    lines.append('%F\t' + '\t'.join(fields))
+    lines.append('%F\t' + '\t'.join(_sanitize_cell(f) for f in fields))
 
     # %R lines
     for record in records:
         values = []
         for field in fields:
-            val = record.get(field, '')
-            if val is None:
-                val = ''
-            values.append(str(val))
+            values.append(_sanitize_cell(record.get(field, '')))
         if len(values) != len(fields):
             raise ValueError(
                 f"Field count mismatch in table {table_name!r}: "
