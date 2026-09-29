@@ -695,9 +695,10 @@ def resolve_task_calendars(data):
     MPXJ writes it that way for every MS Project task that has no task-level
     calendar, and MS Project schedules such a task on the project calendar.
     Looking the blank id up in ``get_calendar_map`` returns None, and a
-    consumer then falls through to its own last resort - a continuous
-    seven-day week in cpp-cpm-engine, 8 h/day in ``duration_hours_to_days`` -
-    without consulting the project and without saying so.
+    consumer then falls through to its own last resort: 8 h/day in
+    ``duration_hours_to_days``, without a word, and in cpp-cpm-engine a
+    continuous seven-day week, with an ALERT, unless the caller hands it the
+    project calendar.
 
     The chain, per TASK row:
 
@@ -819,9 +820,9 @@ def calendar_resolution_block(resolution, keep=None):
     consumer schedules only some of them (one project, no LOE / WBS summary,
     ...) and must disclose what happened to THOSE. ``keep`` is a predicate
     over a resolution row (task_id, task_code, proj_id, clndr_id, ...) that
-    selects them; None keeps every row. One builder, so consumers cannot
-    drift apart on the shape cpp-critical-path-validator publishes as
-    ``calendar_resolution``:
+    selects them; None keeps every row. A consumer that builds the block
+    here, rather than keeping its own copy, cannot drift from the shape
+    cpp-critical-path-validator publishes as ``calendar_resolution``:
 
       ``resolved_by_fallback_count``  blank ids resolved by tier 2 or 3
       ``fallback_calendars``          [{clndr_id, clndr_name, tier, task_count}]
@@ -2002,9 +2003,10 @@ def validate_schedule(data, profile='commercial', subject=None):
         ))
 
     # ── Activities with no usable calendar ────────────────────────────────
-    # The row gives the arithmetic no calendar at all, and a CPM engine's
-    # last resort is a continuous seven-day week. A blank id that resolves to
-    # the project calendar is the file's own meaning and only disclosed.
+    # The row gives the arithmetic no calendar at all: duration_hours_to_days
+    # falls to 8 h/day, and cpp-cpm-engine, handed no project calendar, to a
+    # continuous seven-day week. A blank id that resolves to the project
+    # calendar is the file's own meaning and only disclosed.
     # Skipped when the file has no CALENDAR table - XER-CALENDAR-MISSING
     # already says that.
     if calendars:
@@ -2020,8 +2022,10 @@ def validate_schedule(data, profile='commercial', subject=None):
                     'clndr_id and no PROJECT.clndr_id or default_flag=Y '
                     'calendar to fall back on, {u} naming a clndr_id the '
                     'CALENDAR table does not declare. Working-day arithmetic '
-                    'on these activities runs on a continuous seven-day week, '
-                    'which is not a week this file declares.'.format(
+                    'has no week this file declares to run them on: '
+                    'duration_hours_to_days reads them at 8 h/day, and '
+                    'cpp-cpm-engine, handed no project calendar, schedules '
+                    'them on a continuous seven-day week.'.format(
                         n=len(_unres), b=_blank, u=len(_unres) - _blank)
                 ),
                 evidence={'unresolved_count': len(_unres),

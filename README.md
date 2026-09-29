@@ -101,7 +101,7 @@ for t in tasks[:3]:
 
 ## Blank activity calendar ids
 
-A blank `TASK.clndr_id` means the project calendar, not "no calendar". MPXJ writes it blank for every task of a converted MS Project file that has no task-level calendar. Looked up as it stands, `cal_map.get(task['clndr_id'])` returns `None`, and whatever runs next falls to its last resort: a continuous seven-day week in `cpp-cpm-engine`, 8 h/day in `duration_hours_to_days`. Take the TASK rows through the resolver before looking a calendar up:
+A blank `TASK.clndr_id` means the project calendar, not "no calendar". MPXJ writes it blank for every task of a converted MS Project file that has no task-level calendar. Looked up as it stands, `cal_map.get(task['clndr_id'])` returns `None`, and whatever runs next falls to its last resort: 8 h/day in `duration_hours_to_days`, without a word, and in `cpp-cpm-engine` a continuous seven-day week, with an ALERT, unless the caller hands it the project calendar. Take the TASK rows through the resolver before looking a calendar up:
 
 ```python
 from xer_parser import (get_table, get_calendar_map, duration_hours_to_days,
@@ -116,7 +116,7 @@ for t in tasks:
 ```
 
 - `resolve_task_calendars` applies the chain `TASK.clndr_id` → `PROJECT.clndr_id` for the row's `proj_id` → the calendar flagged `default_flag = 'Y'`.
-- `with_resolved_calendars` fills only blank ids and returns copies, so the parsed data stays as received.
+- `with_resolved_calendars` fills only blank ids. A filled row is a copy and every other row is passed through as it is, so the parsed data stays as received.
 - `resolution['unresolved']` lists every row left with no usable calendar: a blank id with nothing to fall back on, or an id the CALENDAR table does not declare, which is reported and never replaced.
 - `validate_schedule` raises a BLOCK `XER-TASK-CALENDAR-UNRESOLVED` for those rows, and an INFO `XER-TASK-CALENDAR-FALLBACK` when blank ids resolved. `generate_summary` converts float on the resolved calendar.
 - A consumer that works on only some of the rows (one project, no LOE or WBS summaries) builds what it discloses with `calendar_resolution_block(resolution, keep=...)`.

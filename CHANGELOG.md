@@ -8,7 +8,7 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ### Added
 
-- **A blank activity calendar id is read as the project calendar.** MPXJ, converting an MS Project file, writes `TASK.clndr_id` empty for every task without a task-level calendar, and MS Project schedules such a task on the project calendar. A lookup on the blank id found no calendar. `generate_summary` then converted those activities' float at a flat 8 h/day, and a consumer handing the rows to `cpp-cpm-engine` had them scheduled on a continuous seven-day week. Three functions are new:
+- **A blank activity calendar id is read as the project calendar.** MPXJ, converting an MS Project file, writes `TASK.clndr_id` empty for every task without a task-level calendar, and MS Project schedules such a task on the project calendar. A lookup on the blank id found no calendar. `generate_summary` then converted those activities' float at a flat 8 h/day, and `cpp-cpm-engine`, handed the rows without a project calendar, scheduled them on a continuous seven-day week. Three functions are new:
   - `resolve_task_calendars(data)` gives the calendar every TASK row is scheduled on, through the chain `TASK.clndr_id` → `PROJECT.clndr_id` of the row's project → the `default_flag = 'Y'` calendar. It lists every row left with no usable calendar: blank with nothing to fall back on, or naming a calendar the file does not declare. A named calendar is never replaced.
   - `with_resolved_calendars(tasks, resolution)` returns the rows carrying the resolved id. Filled rows are copies, and the parsed data is untouched.
   - `calendar_resolution_block(resolution, keep=None)` builds the disclosure block, limited to the rows a consumer works on.
