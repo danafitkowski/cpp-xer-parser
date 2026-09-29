@@ -4,7 +4,16 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
-## Unreleased
+## v0.2.0 — 2026-09-29
+
+The first release since v0.1.0. Calendar decoding, working-day arithmetic, the XER writer and the schedule summary are brought up to CPP's internal parser. A blank activity calendar id now resolves to the project calendar. `validate_schedule` and `aace_31r_compliance` run from a plain clone. The README, `SECURITY.md` and the table reference say what the code does.
+
+**Output changes a caller may notice.** None of the public function signatures changed, but several results did, each from wrong to right:
+
+- Finding `check_id`s are `XER-*`, no longer `AACE-31R-03-*` (see the last entries under Changed).
+- Working-day counts and steps move on a finish-first calendar, on a worked exception day, for datetimes whose clock times differ, for half-day values, and for a zero-day step from a non-working day (see Fixed).
+- `generate_summary`: `loe_count` no longer counts WBS summary rows, `critical_activities` is the complete list, and `critical_path` has no `note` key.
+- `validate_schedule` raises the new activity-calendar findings (see Added).
 
 ### Added
 
@@ -51,15 +60,17 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 - **README field counts corrected to the measured ones.** The README's "XER generation rules" gave PROJECT 72, SCHEDOPTIONS 26, PROJWBS 27, TASK 62 and TASKPRED 12 for P6 24.12, one more than `TABLE_FIELD_COUNTS_BY_VERSION` holds for each, and an earlier unreleased edit published the disagreement as an open question. The 163 genuine exports at 23.10, 23.12 and 24.12 measured for `references/table-reference.md` settle it: 71, 25, 26, 61 and 11, as the constant already held, with `crt_path_num` the 61st TASK field at 24.12 as at 23.x. The README now gives those numbers, and the comment above the constant records the measurement in place of the `TODO(schema-truth)`. The v0.1.0 notes below carry the old figures and are left as released. The same section now also shows all nine ERMHDR fields, says the default encoding is UTF-8 (it said ASCII), calls `TABLE_ORDER` a generation order rather than an export order, and lists the `%E` marker and the cell-value rule.
 - Removed the unverifiable marketing line "This closes the flagship gap in the commercial forensic-scheduling tooling market."
 - The module docstring of `scripts/xer_parser.py` no longer calls the file the "Canonical Primavera P6 XER Engine" and the "single source of truth for all XER file operations across all skills".
+- README badges: the hand-written `status: stable` badge, which could not go red, is replaced by the live GitHub Actions test badge and a version badge, as `cpp-critical-path-validator` did at its v0.2.0. `SECURITY.md` supports 0.2.x.
+- Validation findings repointed to the correct AACE documents: file-validity and baseline-quality checks now cite AACE 29R-03 §2.1; profile-range checks (WBS depth, activity count) cite the CPP profile with AACE 38R-06 §3.5 (Planning Basis); missing-logic cites AACE 29R-03 §2.1.B.5 / DCMA 14-Point #1. Citations to AACE 31R-03 (a cost-estimate RP, the wrong document for these checks) and 53R-06 pinpoints (that RP has no numbered sections) were removed.
+- Finding `check_id` values renamed from `AACE-31R-03-*` to `XER-*` (`XER-PROJECT-MISSING`, `XER-CALENDAR-MISSING`, `XER-WBS-DEPTH-LOW`, `XER-WBS-DEPTH-HIGH`, `XER-ACTIVITY-COUNT-LOW`, `XER-ACTIVITY-COUNT-HIGH`, `XER-NO-TASKPRED`).
 
 ### Testing
 
 - `pytest tests/` is 100 tests across 10 files: the existing parser, half-step and citation-guard files, `test_bundled_validation_runs.py`, three activity-calendar files (`test_task_calendar_resolution_2026_09_18.py`, `test_calendar_resolution_block_2026_09_19.py`, `test_calendar_map_default_flag_2026_09_19.py`), and three files for the ports above (`test_calendar_slot_order_2026_09_29.py`, `test_workday_arithmetic_2026_09_29.py`, `test_writer_and_summary_2026_09_29.py`). All fixtures are synthetic. 99 pass and one skips: the engine-parity test, which runs and passes when `cpp-cpm-engine`'s `python_reference` directory is on `sys.path`. The CI workflow's direct-invocation step runs `test_bundled_validation_runs.py` as well.
 
-### Changed (earlier, unreleased)
+### Engine compatibility
 
-- Validation findings repointed to the correct AACE documents: file-validity and baseline-quality checks now cite AACE 29R-03 §2.1; profile-range checks (WBS depth, activity count) cite the CPP profile with AACE 38R-06 §3.5 (Planning Basis); missing-logic cites AACE 29R-03 §2.1.B.5 / DCMA 14-Point #1. Citations to AACE 31R-03 (a cost-estimate RP, the wrong document for these checks) and 53R-06 pinpoints (that RP has no numbered sections) were removed.
-- Finding `check_id` values renamed from `AACE-31R-03-*` to `XER-*` (`XER-PROJECT-MISSING`, `XER-CALENDAR-MISSING`, `XER-WBS-DEPTH-LOW`, `XER-WBS-DEPTH-HIGH`, `XER-ACTIVITY-COUNT-LOW`, `XER-ACTIVITY-COUNT-HIGH`, `XER-NO-TASKPRED`).
+Tested against `cpp-cpm-engine` v2.9.49. With its `python_reference` directory on `sys.path`, the working-day parity test compares 6,490 `add_work_days` / `subtract_work_days` calls with the engine's, and all agree. The engine consumes the parse output and the parse output does not depend on the engine's math. Working-day parity has been measured against v2.9.49 only.
 
 ---
 

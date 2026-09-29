@@ -12,10 +12,10 @@ Thank you for taking the time to report.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | Yes                |
-| < 0.1   | No                 |
+| 0.2.x   | Yes                |
+| < 0.2   | No                 |
 
-The parser ships as `cpp-xer-parser` on GitHub. The most recent published version is always the supported reference; back-ports of security fixes to prior 0.1.x point releases are made on a best-effort basis.
+The parser ships as `cpp-xer-parser` on GitHub. The most recent published version is always the supported reference; back-ports of security fixes to earlier releases are made on a best-effort basis.
 
 ---
 
@@ -90,4 +90,4 @@ Out of scope:
 
 ---
 
-*Last updated: 2026-09-02.*
+*Last updated: 2026-09-29.*
