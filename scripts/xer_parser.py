@@ -159,24 +159,46 @@ TABLE_ORDER = [
     'WBSMEMO', 'PROJMEMO', 'RISKTYPE', 'RISK'
 ]
 
-# Known field counts per table, keyed by P6 schema family.
-# Observed from real exports — P6 added/removed fields across major versions,
-# so validation must be version-aware or warnings fire on every valid XER.
+# Known field counts per table, keyed by P6 major-version family.
+# P6 added and removed fields across major versions, so validation must be
+# version-aware or warnings fire on every valid XER.
 #
-# TODO(schema-truth): the values below (e.g. PROJECT=71, TASK=61 for the 22/23/24
-# family) disagree with SKILL.md §Field-counts which currently states 72 / 62.
-# We need a fresh canonical P6 24.12 export to verify which side is correct
-# before changing either; both have plausible historical lineage and guessing
-# would silently break field-count validation for every consumer. Until then,
-# leave this constant intact and remember the SKILL.md numbers may need to be
-# fixed there (NOT here).
+# MEASURED against the 166 genuine P6 exports behind
+# references/table-reference.md: ERMHDR 19.12 (3 files), 23.10 (4), 23.12 (109),
+# 24.12 (50). The 163 exports at 23.10 / 23.12 / 24.12 all read PROJECT=71,
+# PROJWBS=26, TASK=61, TASKPRED=11, SCHEDOPTIONS=25. No export gave a different
+# count for a table it carried. Not every export carries every table: PROJECT,
+# PROJWBS and TASK appear in 163 of 163, TASKPRED in 159, SCHEDOPTIONS in 140. A
+# missing SCHEDOPTIONS or TASKPRED is normal, not malformed. The 3 exports at
+# 19.12 read PROJECT=82, PROJWBS=27, TASK=66, TASKPRED=10, SCHEDOPTIONS=25,
+# matching the '19' entry on the three keys it carries.
+#
+# `crt_path_num` is field 61 of 61 in every one of those 163 exports, including
+# all 50 genuine 24.12 files. It is a standard member of the 61-field TASK layout,
+# not a 24.12 addition that takes TASK to 62. Do not version-gate it, and do not
+# raise the '24' entry to 62.
+#
+# NOT measured: no 22.x or 20.x export is in the measured set. The '22' and '20'
+# entries are extrapolations from their neighbours, kept only so a file at those
+# versions is checked rather than silently skipped. Do not quote them as measured,
+# and do not describe these counts as covering a "22.x / 23.x / 24.x family" —
+# the measured versions are 19.12, 23.10, 23.12 and 24.12.
+#
+# Counts are a sanity check, not a parsing contract. Field count and column order
+# vary inside a single version and between adjacent versions: RSRC appears with
+# both 28 and 31 fields at 23.12, 24.12 moves `rsrc_type` and `location_id` to the
+# end of the RSRC row, and TASKRSRC swaps `has_rsrchours` for `update_user` and
+# `update_date` at 24.12. Always index by name from the %F line, never by position.
 TABLE_FIELD_COUNTS_BY_VERSION = {
-    # P6 22.x / 23.x / 24.x share the same schema for these core tables
+    # Measured identical across 23.10, 23.12 and 24.12 (163 genuine exports).
     '24': {'PROJECT': 71, 'SCHEDOPTIONS': 25, 'PROJWBS': 26, 'TASK': 61, 'TASKPRED': 11},
     '23': {'PROJECT': 71, 'SCHEDOPTIONS': 25, 'PROJWBS': 26, 'TASK': 61, 'TASKPRED': 11},
+    # Unmeasured extrapolation — no 22.x export has been seen.
     '22': {'PROJECT': 71, 'SCHEDOPTIONS': 25, 'PROJWBS': 26, 'TASK': 61, 'TASKPRED': 11},
-    # P6 19.x / 20.x have a different schema (more fields on some tables,
-    # fewer on TASKPRED, no SCHEDOPTIONS in some variants).
+    # 19.12 is a different layout (more fields on PROJECT/PROJWBS/TASK, fewer on
+    # TASKPRED). '20' is an unmeasured extrapolation from it. Neither entry carries
+    # a PROJWBS or SCHEDOPTIONS key, so those two tables are not field-count-checked
+    # at these versions even though 19.12 measures PROJWBS=27 and SCHEDOPTIONS=25.
     '20': {'PROJECT': 82, 'TASK': 66, 'TASKPRED': 10},
     '19': {'PROJECT': 82, 'TASK': 66, 'TASKPRED': 10},
 }
