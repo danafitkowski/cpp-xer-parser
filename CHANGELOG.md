@@ -6,6 +6,16 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ## Unreleased
 
+### Added
+
+- **A blank activity calendar id is read as the project calendar.** MPXJ, converting an MS Project file, writes `TASK.clndr_id` empty for every task without a task-level calendar, and MS Project schedules such a task on the project calendar. A lookup on the blank id found no calendar. `generate_summary` then converted those activities' float at a flat 8 h/day, and a consumer handing the rows to `cpp-cpm-engine` had them scheduled on a continuous seven-day week. Three functions are new:
+  - `resolve_task_calendars(data)` gives the calendar every TASK row is scheduled on, through the chain `TASK.clndr_id` → `PROJECT.clndr_id` of the row's project → the `default_flag = 'Y'` calendar. It lists every row left with no usable calendar: blank with nothing to fall back on, or naming a calendar the file does not declare. A named calendar is never replaced.
+  - `with_resolved_calendars(tasks, resolution)` returns the rows carrying the resolved id. Filled rows are copies, and the parsed data is untouched.
+  - `calendar_resolution_block(resolution, keep=None)` builds the disclosure block, limited to the rows a consumer works on.
+- **`validate_schedule` reports activity calendars.** It raises BLOCK `XER-TASK-CALENDAR-UNRESOLVED` for TASK rows with no usable calendar, and INFO `XER-TASK-CALENDAR-FALLBACK` when blank ids resolved. A file whose TASK rows carry no calendar, and which names no project or default calendar, now draws the BLOCK, and `aace_31r_compliance` scores it accordingly.
+- `generate_summary` converts float on each activity's resolved calendar.
+- `get_calendar_map` entries carry the row's `default_flag`.
+
 ### Fixed
 
 - **`validate_schedule` and `aace_31r_compliance` now run from a plain clone**, which is what the README has always said they do. Two defects stopped them. First, the optional-import stanza pulled `audit_trail` (which does not ship in this repository) in the same `try` block as `validation` and `config_profiles` (which do), so one missing module discarded the two that were present, and both functions raised `RuntimeError` with their dependencies sitting next to them in `scripts/`. The two import groups are now separate. Second, the bundled `ValidationReport` subset carried `counts()` but not `count(severity)`, which `aace_31r_compliance` calls to score a schedule; `count()` has been added to the subset, which leaves `xer_parser.py` unchanged for the repositories that vendor it. `tests/test_bundled_validation_runs.py` pins both halves and fails against the previous code.
@@ -22,7 +32,7 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ### Testing
 
-- `pytest tests/` is 22 tests across 4 files, all passing: the existing parser, half-step and citation-guard files plus the new `test_bundled_validation_runs.py`. The CI workflow's direct-invocation step runs the new file as well.
+- `pytest tests/` is 42 tests across 7 files, all passing: the existing parser, half-step and citation-guard files, `test_bundled_validation_runs.py`, and three activity-calendar files (`test_task_calendar_resolution_2026_09_18.py`, `test_calendar_resolution_block_2026_09_19.py`, `test_calendar_map_default_flag_2026_09_19.py`, all synthetic). The CI workflow's direct-invocation step runs `test_bundled_validation_runs.py` as well.
 
 ### Changed (earlier, unreleased)
 
