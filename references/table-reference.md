@@ -492,9 +492,11 @@ five-day, eight-hour calendar with three holidays):
 - In the example above, days 2 to 6 carry slots and days 1 and 7 do not, so the
   calendar is Monday to Friday.
 
-**Time slots.** A slot is `(0||i(s|HH:MM|f|HH:MM)())`, where `i` is the slot index
-inside that day. A day can carry more than one slot. A real split-shift weekday,
-verbatim from a 24.12 export:
+**Time slots.** A slot is `(0||i(s|HH:MM|f|HH:MM)())` **or**
+`(0||i(f|HH:MM|s|HH:MM)())`. Both field orders occur, and the order is a
+property of the individual calendar, not of the file or the P6 version: see
+point 3 below. `i` is the slot index inside that day. A day can carry more than
+one slot. A real split-shift weekday, verbatim from a 24.12 export:
 
 ```
 (0||2()((0||0(s|08:00|f|12:00)())(0||1(s|13:00|f|17:00)())))
@@ -539,7 +541,7 @@ the affected days non-working.
 
   Serial 45868 is 2025-07-30, worked 08:00 to 17:00.
 
-**Two further things that will break a naive decoder:**
+**Three further things that will break a naive decoder:**
 
 1. P6 inserts `\x7f\x7f` line markers and whitespace between an exception's serial
    and its body. A regex that requires the serial and the time slot to be adjacent
@@ -549,11 +551,25 @@ the affected days non-working.
 2. There is no `e|` marker and no ISO date anywhere in `clndr_data`. Across all
    523 measured calendars, `e|YYYY-MM-DD` scores zero matches and so does the
    weekday form `(0||d|N(s|`.
+3. **A time slot is written in either field order, `(s|HH:MM|f|HH:MM)` or
+   `(f|HH:MM|s|HH:MM)`.** The order belongs to the individual calendar, not to
+   the file or the P6 version: one genuine 24.12 export carries a start-first
+   five-day calendar and a finish-first six-day calendar side by side, so the
+   order cannot be decided from the header. Start-first is by far the more
+   common, which is how a start-first-only decoder goes unnoticed. Such a decoder
+   reads every finish-first calendar as **zero working days**, which downstream
+   becomes a substituted Mon-Fri week, and files every finish-first exception
+   body as a holiday. On a seven-day continuous calendar that means a Mon-Fri
+   week with invented days off. Match both orders.
 
 `parse_calendar_data()` and `get_calendar_map()` in `scripts/xer_parser.py` are
-the decoding entry points for this grammar. Any decoder written against it must
-be separator-tolerant per point 1: match the serial and its body as one segment
-bounded by the next serial, not as adjacent tokens.
+the decoding entry points for this grammar. They implement the separator
+tolerance in point 1 and both slot orders in point 3 (`_TIME_SLOT_RE`). Any
+decoder written against this grammar must do the same: match the serial and its
+body as one segment bounded by the next serial, not as adjacent tokens, and
+accept a slot in either order. A calendar that still decodes to no working days
+comes back with an empty `work_days` list and no warning; see the Scope section
+of the README.
 
 ---
 

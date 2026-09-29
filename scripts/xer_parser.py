@@ -404,6 +404,24 @@ def get_fields(data, table_name):
 # CALENDAR PARSING
 # ─────────────────────────────────────────────
 
+# P6 writes a calendar time slot in either field order, and the order is a
+# property of the individual calendar, not of the export or the P6 version:
+#   (s|08:00|f|16:00)   start-first
+#   (f|12:00|s|08:00)   finish-first
+# Both orders occur inside one genuine P6 24.12 export (a start-first five-day
+# calendar beside a finish-first six-day calendar), so the order cannot be
+# decided from the export header. Hours may be 1 or 2 digits ('8:00').
+#
+# Accepting only start-first made every finish-first calendar decode to zero
+# working days, which the working-day helpers then replaced with a Mon-Fri
+# week, and filed every finish-first exception body as a holiday. Calendars
+# that hit include a genuine Mon-Sat six-day calendar and a seven-day
+# continuous calendar.
+_TIME_SLOT_RE = re.compile(
+    r'\((?:s\|\d{1,2}:\d{2}\|f|f\|\d{1,2}:\d{2}\|s)\|\d{1,2}:\d{2}\)'
+)
+
+
 def parse_calendar_data(clndr_data_str):
     """
     Parse the encoded clndr_data field from the CALENDAR table.
@@ -488,9 +506,9 @@ def parse_calendar_data(clndr_data_str):
                         break
                 j += 1
             day_body = dow_block[start:j]
-            # A day is a work day iff it contains at least one time slot `(s|...|f|...)`.
-            # P6 emits times as either `08:00` or `8:00` — accept 1 or 2 digit hour.
-            if re.search(r'\(s\|\d{1,2}:\d{2}\|f\|\d{1,2}:\d{2}\)', day_body):
+            # A day is a work day iff it contains at least one time slot, in
+            # either P6 field order — see _TIME_SLOT_RE.
+            if _TIME_SLOT_RE.search(day_body):
                 day_idx = day_num - 1
                 if 0 <= day_idx <= 6:
                     result['work_days'].append(day_idx)
@@ -560,10 +578,12 @@ def parse_calendar_data(clndr_data_str):
                             break
                     k += 1
             body_text = exc_block[body_start:body_end] if body_end > body_start else ''
-            # Classify: any time slot → working exception; else → holiday
-            is_special_workday = bool(re.search(
-                r'\(s\|\d{1,2}:\d{2}\|f\|\d{1,2}:\d{2}\)', body_text
-            ))
+            # Classify: any time slot → working exception; else → holiday.
+            # Both P6 field orders count — see _TIME_SLOT_RE. A seven-day
+            # continuous calendar can carry dozens of finish-first exception
+            # bodies; matching only start-first turned every one of them into
+            # an invented day off.
+            is_special_workday = bool(_TIME_SLOT_RE.search(body_text))
             # Parse the serial into an ISO date
             iso_date = _xer_exception_serial_to_iso(serial_raw)
             if iso_date:
@@ -587,37 +607,46 @@ def parse_calendar_data(clndr_data_str):
     # above — this fallback preserves holidays without double-classifying.
     if exc_block:
         walker_working = set(result['special_workdays'])
-        # Pre-scan for serials that have a time-slot body → those are
-        # special_workdays, not holidays. Pattern: `d|<serial>` followed
-        # (within a few chars) by `(s|HH:MM|f|HH:MM)`.
-        special_serials = set(re.findall(
-            r'd\|(\d+)\)\(\(?\(?0?\|?\|?0?\(s\|\d{1,2}:\d{2}\|f\|',
-            exc_block,
-        ))
-        # Integer Excel-serial exceptions: d|<int>
-        for serial in re.findall(r'd\|(\d+)\b', exc_block):
-            iso = _xer_exception_serial_to_iso(serial)
-            if not iso:
+        # Classify EACH integer-serial exception by whether ITS OWN segment
+        # (from this serial up to the next serial) contains a work time-slot.
+        # A segment with a time-slot is a special workday (modified working
+        # day), NOT a holiday; an empty body is a genuine non-working holiday.
+        #
+        # The earlier pre-scan regex required the serial and its time-slot body
+        # to be adjacent. P6 separates them with line markers (\x7f\x7f) +
+        # whitespace, so on continuous calendars (7x24 / 7-Day) every working
+        # exception fell through to `holidays`: a continuous calendar decoded
+        # to hundreds of phantom days off and CPM finish dates moved by months.
+        # Per-segment scanning is separator-tolerant and preserves real
+        # statutory holidays (empty body) on work calendars.
+        _time_slot = _TIME_SLOT_RE
+        _int_serials = list(re.finditer(r'd\|(\d+)\b', exc_block))
+        for _idx, _m in enumerate(_int_serials):
+            iso = _xer_exception_serial_to_iso(_m.group(1))
+            if not iso or iso in walker_working:
                 continue
-            if iso in walker_working:
-                continue
-            if serial in special_serials:
+            _seg_end = (_int_serials[_idx + 1].start()
+                        if _idx + 1 < len(_int_serials) else len(exc_block))
+            if _time_slot.search(exc_block[_m.end():_seg_end]):
                 if iso not in result['special_workdays']:
                     result['special_workdays'].append(iso)
             else:
                 result['holidays'].append(iso)
-        # Legacy string exceptions: d|YYYY-MM-DD
+        # Legacy string exceptions: d|YYYY-MM-DD (no inline body observed in
+        # this layout; treat as non-working holidays unless already working).
         for iso in re.findall(r'd\|(\d{4}-\d{2}-\d{2})', exc_block):
             try:
                 y = int(iso[:4])
-                if 1990 <= y <= 2050 and iso not in walker_working:
+                if 1970 <= y <= 2099 and iso not in walker_working:
                     result['holidays'].append(iso)
             except ValueError:
                 continue
 
-    # Remove duplicates and sort
-    result['holidays'] = sorted(list(set(result['holidays'])))
-    result['special_workdays'] = sorted(list(set(result['special_workdays'])))
+    # Remove duplicates and sort. A day carrying explicit work hours is a
+    # working day, never a holiday: if two parse paths disagree on a serial,
+    # special_workday wins (insurance against double-classification).
+    result['special_workdays'] = sorted(set(result['special_workdays']))
+    result['holidays'] = sorted(set(result['holidays']) - set(result['special_workdays']))
 
     return result
 
@@ -625,7 +654,9 @@ def parse_calendar_data(clndr_data_str):
 def _xer_exception_serial_to_iso(serial_raw):
     """Convert a P6 exception date serial (int or YYYY-MM-DD) to an ISO date string.
 
-    Returns '' if the value is malformed or out of the 1990–2050 sanity range.
+    Returns '' if the value is malformed or out of the 1970–2099 sanity range.
+    (The window was 1990–2050 before v0.2.0, which dropped genuine holidays
+    entered for later years.)
     """
     s = serial_raw.strip()
     # Integer Excel-serial date
@@ -634,7 +665,7 @@ def _xer_exception_serial_to_iso(serial_raw):
             serial = int(s)
             # Excel/P6 epoch = 1899-12-30 (accounts for the 1900 leap-year bug)
             dt = datetime(1899, 12, 30) + timedelta(days=serial)
-            if 1990 <= dt.year <= 2050:
+            if 1970 <= dt.year <= 2099:
                 return dt.strftime('%Y-%m-%d')
         except (ValueError, OverflowError):
             pass
@@ -643,7 +674,7 @@ def _xer_exception_serial_to_iso(serial_raw):
     if m:
         try:
             dt = datetime.strptime(m.group(1), '%Y-%m-%d')
-            if 1990 <= dt.year <= 2050:
+            if 1970 <= dt.year <= 2099:
                 return m.group(1)
         except ValueError:
             pass
