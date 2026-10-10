@@ -458,7 +458,7 @@ Present in 1 of 166 files (23.12). 9 fields.
 | base_clndr_id | Base/parent calendar | Inheritance |
 | last_chng_date | Last modified | Audit trail |
 | clndr_type | Calendar type | Measured: CA_Base, CA_Project, CT_Project |
-| day_hr_cnt | **Hours per workday** | **Duration conversion** |
+| day_hr_cnt | **Hours per workday** | **Duration conversion**, unless every working day of the calendar's week works the same other number of hours: P6 schedules on the shifts, so convert on the hours they work (`get_calendar_map` does) |
 | week_hr_cnt | Hours per workweek | Duration conversion |
 | month_hr_cnt | Hours per month | P6's default is **172**, not 168. Measured: 172 on 299 calendars, 160 on 175; the value 168 appears on none |
 | year_hr_cnt | Hours per year | |
@@ -911,7 +911,7 @@ to TASKMEMO, TASKRSRC and TASKPRED.
 All durations in TASK are stored in **hours**:
 
 - `target_drtn_hr_cnt / hours_per_day = baseline workdays`
-- Get `hours_per_day` from the CALENDAR table (via `clndr_id`)
+- Get `hours_per_day` from the CALENDAR table (via `clndr_id`): `day_hr_cnt`, or the hours the shifts work when every working day works the same number and `day_hr_cnt` says otherwise
 - Default: 8 hours/day if calendar lookup fails
 - Duration delta: `actual_duration - baseline_duration = delay in workdays`
 
@@ -1192,7 +1192,7 @@ file contains rather than to a fixed list.
 | **Tab delimiters** | XER uses `\t`, never commas or spaces. Fields may contain commas and spaces that are not delimiters. |
 | **Empty fields** | Empty strings between tabs, not NULL, not "N/A". |
 | **Dates** | Always `YYYY-MM-DD HH:MM`, and **timezone-naive local wall-clock**. The file carries no timezone marker of any kind, and P6 applies no conversion on export. Never convert from UTC. Measured: every one of the 1,367,430 cells in the ground-truth set that begins with a date matches `YYYY-MM-DD HH:MM` exactly, none carries a `Z`, a `T` or an offset, none is date-only, and 8,561 of 8,879 timed actual starts land on exactly 08:00, matching the calendars' own 08:00 work-window start. A site 08:00 exported as UTC from an Ontario database would read 12:00 or 13:00, and none do. |
-| **Durations** | ALL in hours. Divide by `day_hr_cnt` from CALENDAR for workdays. |
+| **Durations** | ALL in hours. Divide by the calendar's hours per day for workdays: `day_hr_cnt`, unless every working day works the same other number of hours, when P6 schedules on the shifts (a Monday-Saturday 07:00-17:00 calendar declaring 8 runs 40 h in four days). |
 | **Calendar times** | `clndr_data` hours are not consistently zero-padded: `s|8:00` occurs alongside `s|08:00` in 21 of the 166 files (19.12, 23.10, 23.12). Match `\d{1,2}:\d\d`, or the affected days parse as non-working. |
 | **Hours per month** | P6's default `month_hr_cnt` is 172, not 168. Measured across 523 calendars: 172 on 299, 160 on 175, and 168 on none. |
 | **Multi-project** | XER can contain multiple projects. Filter by `proj_id`. |
