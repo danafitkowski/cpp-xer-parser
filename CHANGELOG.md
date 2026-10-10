@@ -4,6 +4,30 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
+## v0.3.0 — 2026-10-10
+
+A calendar's hours per day are the hours its shifts work when every working day of its week works the same number of hours and `day_hr_cnt` says otherwise. That is how P6 schedules, measured on Primavera P6 Professional 23.12.1's own F9.
+
+**Why a minor release.** Before 1.0 this project moves the minor number for a release that changes results a caller already reads. `get_calendar_map` can now give a calendar a different `hours_per_day`, and every hours-to-days conversion reads it: `duration_hours_to_days`, the float `generate_summary` reports, and anything a caller computes from the map. Nothing moves on a calendar whose shifts work the hours `day_hr_cnt` declares, or whose working days work different hours.
+
+### Changed
+
+- **Hours per day come from the shifts when `day_hr_cnt` disagrees with all of them.** P6 schedules a duration in hours against the calendar's shifts; `day_hr_cnt` ("Hours per Day") only converts hours to days for display. Scheduled with F9 on 10-Oct-2026, a Monday-Saturday 07:00-17:00 calendar, ten hours a day, declaring `day_hr_cnt` 8, ran a 40 h activity over four days. `get_calendar_map` divided by 8 and gave five. It now reads the hours of each working day from the calendar's DaysOfWeek block, in either P6 slot order and with a 00:00 finish read as the end of the day, and when every working day works the same H and H is not `day_hr_cnt`, sets `hours_per_day` to H. A week whose working days work different hours keeps `day_hr_cnt`, since no one figure is right for it; a calendar with no DaysOfWeek block, or one of the older bare-day encodings, which carry no hours, keeps it too.
+
+  The rule is the one `cpp-cpm-engine` v2.9.54's `parseXER` applies, and CPP's internal parser since the same day. It was found comparing the engine with P6's F9 of real updates, where such a calendar put unfinished work days off P6, and measured on a synthetic probe project in P6.
+
+### Added
+
+- **`declared_hours_per_day`** on a calendar whose `hours_per_day` was taken from its shifts: the file's `day_hr_cnt`, as it was.
+- **`calendar_shift_hours(cal_map)`** lists those calendars: `clndr_id`, `clndr_name`, `hours_per_day` and `declared_hours_per_day`. Empty when none.
+- **`CalendarShiftHoursWarning`**, a `UserWarning` subclass `get_calendar_map` raises once per such calendar, naming it and both figures.
+
+### Testing
+
+- `tests/test_calendar_shift_hours_2026_10_10.py` has 7 tests, all synthetic: the ten-hour week declared at eight, 40 hours converting to four days, finish-first slots, a calendar whose shifts match `day_hr_cnt`, a week of unequal days, a midnight finish, and calendars with no hours to read. The three that pin the change fail on v0.2.1, and two more fail there because the function they call is new. CI runs the file under pytest and directly. `pytest tests/` is 116 tests across 12 files: 115 pass and the engine-parity test skips, and all 116 pass with `cpp-cpm-engine` v2.9.54's `python_reference` directory on `sys.path`.
+
+---
+
 ## v0.2.1 — 2026-09-29
 
 The bundled `ValidationReport` serialises with the summary CPP's internal version carries, so a caller can read a report's worst severity from it. Nothing a v0.2.0 caller already reads moves: the change adds a key, a property and an optional argument, and changes no existing value.
