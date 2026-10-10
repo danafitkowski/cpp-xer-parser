@@ -3,7 +3,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![tests](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml)
-[![version: 0.2.1](https://img.shields.io/badge/version-0.2.1-blue.svg)](CHANGELOG.md)
+[![version: 0.3.0](https://img.shields.io/badge/version-0.3.0-blue.svg)](CHANGELOG.md)
 
 A standalone parser and generator for Primavera P6 XER files. Pure Python 3.10+, MIT-licensed, no third-party runtime dependencies.
 
@@ -83,6 +83,7 @@ for t in tasks[:3]:
 | Calendar map (with holidays)         | `get_calendar_map(data)`                                              |
 | Activity calendars, blank id = project calendar | `resolve_task_calendars(data)`, `with_resolved_calendars(tasks, resolution)` |
 | Calendar-resolution disclosure block | `calendar_resolution_block(resolution, keep=None)`                    |
+| Calendars converted on their shifts  | `calendar_shift_hours(cal_map)`                                       |
 | WBS hierarchy with full paths        | `build_wbs_map(data)`                                                 |
 | Resource assignments per task        | `build_resource_map(data)`                                            |
 | Predecessor / successor maps         | `build_predecessor_map(data)`                                         |
@@ -122,6 +123,7 @@ for t in tasks:
 - `validate_schedule` raises a BLOCK `XER-TASK-CALENDAR-UNRESOLVED` for those rows, and an INFO `XER-TASK-CALENDAR-FALLBACK` when blank ids resolved. `generate_summary` converts float on the resolved calendar.
 - A consumer that works on only some of the rows (one project, no LOE or WBS summaries) builds what it discloses with `calendar_resolution_block(resolution, keep=...)`.
 - `get_calendar_map` entries carry the row's `default_flag`.
+- A calendar's `hours_per_day` is the hours its shifts work when every working day of its week works the same number of hours and `day_hr_cnt` says otherwise. P6 schedules a duration against the shifts; `day_hr_cnt` ("Hours per Day") only converts hours to days for display. A Monday-Saturday 07:00-17:00 calendar declaring 8 ran a 40 h activity over four days on P6's own F9, and `duration_hours_to_days` now gives 4. The file's figure is kept as `declared_hours_per_day`, `calendar_shift_hours(cal_map)` lists every such calendar, and a `CalendarShiftHoursWarning` names each. A week whose working days work different hours keeps `day_hr_cnt`.
 
 ---
 
@@ -189,7 +191,7 @@ pip install pytest
 pytest tests/
 ```
 
-`pytest tests/` runs 109 tests across 11 files. 108 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 109 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
+`pytest tests/` runs 116 tests across 12 files. 115 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 116 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
 
 All tests build their XER fixtures synthetically in memory; no real client XER files ship with the repo.
 
