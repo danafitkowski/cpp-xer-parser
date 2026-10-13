@@ -86,6 +86,7 @@ for t in tasks[:3]:
 | Calendars converted on their shifts  | `calendar_shift_hours(cal_map)`                                       |
 | WBS hierarchy with full paths        | `build_wbs_map(data)`                                                 |
 | Resource assignments per task        | `build_resource_map(data)`                                            |
+| Assignments as P6 schedules resource dependent work | `resource_dependent_assignments(data)`                  |
 | Predecessor / successor maps         | `build_predecessor_map(data)`                                         |
 | Activity code map                    | `build_activity_code_map(data)`                                       |
 | User-defined field map               | `build_udf_map(data)`                                                 |
@@ -98,6 +99,15 @@ for t in tasks[:3]:
 | Half-step XER generator (SmartPM-equivalent) | `compute_half_step_xer(base_path, updated_path, output_path)`         |
 
 † `validate_schedule` and `aace_31r_compliance` run from a plain clone: they use the bundled `scripts/validation.py` and `scripts/config_profiles.py`. `generate_xer_manifest` also needs CPP's internal audit-trail module, which is **not** bundled here. Without it the call raises `RuntimeError` rather than returning a manifest with missing provenance. Everything else in the table needs nothing but the standard library.
+
+---
+
+## The data date P6 schedules from
+
+`parse_xer` reads `PROJECT.last_recalc_date` as P6 schedules from it, and lists every project it changed in `data['data_date_filled']`, so a report can say the date was not the file's own.
+
+- A blank data date is the project's planned start: P6 schedules "from the project data date, using the project start date as the initial data date". The entry reads `{'proj_id', 'last_recalc_date', 'filled_from': 'plan_start_date'}`. A blank with no planned start stays blank.
+- A filed data date on an earlier day than the planned start is lifted to the planned start, as P6 lifts it when it opens the project (data date 28 August, planned start 1 September: P6 shows and schedules from 1 September). The entry also carries the filed date as `filed_data_date`. A planned start later the same day is left as filed.
 
 ---
 
@@ -124,6 +134,7 @@ for t in tasks:
 - A consumer that works on only some of the rows (one project, no LOE or WBS summaries) builds what it discloses with `calendar_resolution_block(resolution, keep=...)`.
 - `get_calendar_map` entries carry the row's `default_flag`.
 - A calendar's `hours_per_day` is the hours its shifts work when every working day of its week works the same number of hours and `day_hr_cnt` says otherwise. P6 schedules a duration against the shifts; `day_hr_cnt` ("Hours per Day") only converts hours to days for display. A Monday-Saturday 07:00-17:00 calendar declaring 8 ran a 40 h activity over four days on P6's own F9, and `duration_hours_to_days` now gives 4. The file's figure is kept as `declared_hours_per_day`, `calendar_shift_hours(cal_map)` lists every such calendar, and a `CalendarShiftHoursWarning` names each. A week whose working days work different hours keeps `day_hr_cnt`.
+- An empty calendar record (no `clndr_data`) is P6's internal Standard: Monday to Friday, 08:00-16:00, eight hours a day, no holidays, whatever `day_hr_cnt` declares. Records declaring 10, 6 and 24 hours all ran the same 08:00-16:00 days on P6's own F9. The entry carries `empty_record: True` and keeps the declared figure as `declared_hours_per_day`; `calendar_shift_hours` does not list it, since it has no shifts.
 
 ---
 
@@ -191,7 +202,7 @@ pip install pytest
 pytest tests/
 ```
 
-`pytest tests/` runs 116 tests across 12 files. 115 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 116 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
+`pytest tests/` runs 130 tests across 13 files. 129 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 130 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
 
 All tests build their XER fixtures synthetically in memory; no real client XER files ship with the repo.
 
