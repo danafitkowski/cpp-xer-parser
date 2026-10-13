@@ -12,8 +12,8 @@ Thank you for taking the time to report.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.3.x   | Yes                |
-| < 0.3   | No                 |
+| 0.4.x   | Yes                |
+| < 0.4   | No                 |
 
 The parser ships as `cpp-xer-parser` on GitHub. The most recent published version is always the supported reference; back-ports of security fixes to earlier releases are made on a best-effort basis.
 

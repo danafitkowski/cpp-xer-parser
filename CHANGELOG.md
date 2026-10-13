@@ -4,6 +4,30 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
+## v0.4.0 — 2026-10-13
+
+The data date and the calendars are read the way P6 schedules from them. Each rule was measured on Primavera P6 Professional 23.12.1's own F9, and each is the one `cpp-cpm-engine` v2.10.1's `parseXER` applies.
+
+**Why a minor release.** Before 1.0 this project moves the minor number for a release that changes results a caller already reads. `parse_xer` can now hand back a different `PROJECT.last_recalc_date`, and `get_calendar_map` a different calendar for an empty record: its working days, `hours_per_day`, and so every hours-to-days conversion on it. Nothing moves for a project whose data date is filed on or after the day of its planned start, or for a calendar record that carries its week.
+
+### Changed
+
+- **A blank data date is the project's planned start.** P6 schedules "from the project data date, using the project start date as the initial data date". `parse_xer` fills a blank `PROJECT.last_recalc_date` from `plan_start_date` in place, so every consumer reads the date P6 schedules from. A blank with no planned start stays blank.
+- **A data date filed on an earlier day than the planned start is lifted to it.** P6 lifts the data date to a later planned start when it opens the project, and schedules from there: with a data date of 28 August and a planned start of 1 September, P6 shows and schedules from 1 September. A planned start later the same day is left as filed.
+- **An empty calendar record is P6's internal Standard.** A record with no `clndr_data` is scheduled Monday to Friday, 08:00-16:00, eight hours a day, with no holidays, whatever `day_hr_cnt` declares: records declaring 10, 6 and 24 hours ran the same 08:00-16:00 days, and a 40-hour task from a Friday worked through the Labour Day holiday the record's base calendar carries. v0.3.0 gave such a record no working days and converted hours at the declared figure, so 40 hours on a record declaring 10 read as four days where P6 schedules five.
+
+### Added
+
+- **`data['data_date_filled']`**: one entry per project whose data date `parse_xer` changed, `{proj_id, last_recalc_date, filled_from: 'plan_start_date'}`, plus `filed_data_date` when a filed date was lifted. Empty when nothing changed. A report can use it to say the data date was not the file's own.
+- **`empty_record`** (True) and **`declared_hours_per_day`** on the calendar-map entry of an empty record. `calendar_shift_hours` does not list it: its hours were not taken from shifts it does not have.
+- **`resource_dependent_assignments(data)`**: `{task_id: [assignment, ...]}`, each TASKRSRC row as P6 schedules it on a resource dependent activity: `rsrc_id`; `clndr_id`, the resource's calendar (None for a role, or a resource the file does not carry, which then works the activity's calendar); `remaining_hours`, remaining units over remaining units per hour; `lag_hours`, the remaining lag, or the planned lag when that is blank; and `driving`, False only where Drive Activity Dates is off.
+
+### Testing
+
+- `tests/test_p6_rules_2026_10_13.py` has 14 tests, all synthetic. Eleven fail on v0.3.0; the other three pin what must not move (a calendar with its week, the Monday to Friday count, and the shift-hours listing). CI runs the file under pytest and directly. `pytest tests/` is 130 tests across 13 files: 129 pass and the engine-parity test skips, and all 130 pass with `cpp-cpm-engine` v2.10.1's `python_reference` directory on `sys.path`.
+
+---
+
 ## v0.3.0 — 2026-10-10
 
 A calendar's hours per day are the hours its shifts work when every working day of its week works the same number of hours and `day_hr_cnt` says otherwise. That is how P6 schedules, measured on Primavera P6 Professional 23.12.1's own F9.
