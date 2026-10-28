@@ -3,7 +3,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![tests](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml)
-[![version: 0.4.0](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
+[![version: 0.5.0](https://img.shields.io/badge/version-0.5.0-blue.svg)](CHANGELOG.md)
 
 A standalone parser and generator for Primavera P6 XER files. Pure Python 3.10+, MIT-licensed, no third-party runtime dependencies.
 
@@ -84,6 +84,7 @@ for t in tasks[:3]:
 | Activity calendars, blank id = project calendar | `resolve_task_calendars(data)`, `with_resolved_calendars(tasks, resolution)` |
 | Calendar-resolution disclosure block | `calendar_resolution_block(resolution, keep=None)`                    |
 | Calendars converted on their shifts  | `calendar_shift_hours(cal_map)`                                       |
+| Corrupt calendar records, P6's fallback | `calendar_corrupt_fallbacks(cal_map)`                              |
 | WBS hierarchy with full paths        | `build_wbs_map(data)`                                                 |
 | Resource assignments per task        | `build_resource_map(data)`                                            |
 | Assignments as P6 schedules resource dependent work | `resource_dependent_assignments(data)`                  |
@@ -135,6 +136,7 @@ for t in tasks:
 - `get_calendar_map` entries carry the row's `default_flag`.
 - A calendar's `hours_per_day` is the hours its shifts work when every working day of its week works the same number of hours and `day_hr_cnt` says otherwise. P6 schedules a duration against the shifts; `day_hr_cnt` ("Hours per Day") only converts hours to days for display. A Monday-Saturday 07:00-17:00 calendar declaring 8 ran a 40 h activity over four days on P6's own F9, and `duration_hours_to_days` now gives 4. The file's figure is kept as `declared_hours_per_day`, `calendar_shift_hours(cal_map)` lists every such calendar, and a `CalendarShiftHoursWarning` names each. A week whose working days work different hours keeps `day_hr_cnt`.
 - An empty calendar record (no `clndr_data`) is P6's internal Standard: Monday to Friday, 08:00-16:00, eight hours a day, no holidays, whatever `day_hr_cnt` declares. Records declaring 10, 6 and 24 hours all ran the same 08:00-16:00 days on P6's own F9. The entry carries `empty_record: True` and keeps the declared figure as `declared_hours_per_day`; `calendar_shift_hours` does not list it, since it has no shifts.
+- A corrupt calendar record is P6's internal Standard too: Monday to Friday, eight hours a day, no holidays. A record is corrupt when its week's shift slots are written finish-first, `(f|HH:MM|s|HH:MM)`, and its `clndr_type` is not a legal P6 token (`CA_Base`, `CA_Rsrc`, `CA_Project`); the one seen in real exports says `CT_Project`. P6 cannot bind such a record and schedules its activities on that Standard, as its own stored dates show. The entry carries `p6_fallback: True` and the `calendar-corrupt-p6-fallback` ALERT under `corrupt_record_alert`; `calendar_corrupt_fallbacks(cal_map)` lists the alerts, and a `CalendarCorruptRecordWarning` names each calendar. Finish-first slots with a legal type are an ordinary export variant and decode as declared. The screen is `cpp-cpm-engine`'s own `decode_calendar_record`, copied into the parser.
 
 ---
 
@@ -202,7 +204,7 @@ pip install pytest
 pytest tests/
 ```
 
-`pytest tests/` runs 130 tests across 13 files. 129 pass and one skips: a parity check of `add_work_days` and `subtract_work_days` against `cpp-cpm-engine`, which runs when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 130 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
+`pytest tests/` runs 142 tests across 14 files. 140 pass and two skip: parity checks against `cpp-cpm-engine`, of `add_work_days` and `subtract_work_days` and of the corrupt-calendar screen, which run when that engine's `python_reference` directory is on `sys.path` (for example `PYTHONPATH=../cpp-cpm-engine/python_reference pytest tests/`), and then all 142 pass. CI runs the same suite on Linux, macOS and Windows against Python 3.10, 3.11 and 3.12.
 
 All tests build their XER fixtures synthetically in memory; no real client XER files ship with the repo.
 
