@@ -4,6 +4,36 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
+## v0.5.0 — 2026-10-28
+
+A corrupt calendar record is read the way P6 schedules it: on P6's internal Standard calendar, not on the week the record declares.
+
+**Why a minor release.** Before 1.0 this project moves the minor number for a release that changes results a caller already reads. `get_calendar_map` can now give a corrupt record a different calendar: its working days, its holidays, its `hours_per_day`, and so every working-day count and hours-to-days conversion on it. Nothing moves for any other record, a finish-first one with a legal `clndr_type` included.
+
+### Changed
+
+- **A corrupt calendar record is P6's internal Standard.** A record is corrupt when (a) its DaysOfWeek block writes at least one shift slot finish-first, `(f|HH:MM|s|HH:MM)`, and (b) its `clndr_type` is not a legal P6 token (`CA_Base`, `CA_Rsrc`, `CA_Project`). The corrupt record seen in real exports says `CT_Project` where every legitimate project calendar says `CA_Project`. P6 cannot bind such a record and schedules the activities assigned to it on its internal Standard: Monday to Friday, eight hours a day, no exceptions. P6's own stored dates in real exports carrying the record show it: every one of 130 unambiguous not-started spans on the calendar walks Monday to Friday, no forecast date lands on the Saturday the record declares working, statutory holidays are worked, and every finish closes at the default calendar's closing time. v0.4.0 read the record as declared, so a record declaring Monday to Saturday counted Saturdays P6 does not work.
+
+  `get_calendar_map` now gives such a record Monday to Friday, no holidays, `hours_per_day` 8 whatever `day_hr_cnt` says (40 hours on a record declaring 10 is five days, as P6 schedules it), and `hours_per_week` 40. The screen is `cpp-cpm-engine`'s own `decode_clndr_data` and `decode_calendar_record`, the decoder its `parseXER` applies, copied into the parser unchanged so it runs without the engine installed.
+
+- **Finish-first slots alone are not corruption.** Records with a legal `clndr_type` and finish-first slots were shown genuine by P6's own stored dates (their declared week walked, their own holidays kept), and they decode as declared, as before. So does a record with an illegal type and start-first slots: both conditions are needed.
+
+- **A finish-first record with no `clndr_type` takes the fallback.** A blank or missing type is not a legal token, so it meets condition (b), as it does in the engine. A genuine P6 export always writes the type; a hand-built or converted file that leaves it out and writes finish-first slots now reads as the Standard, with the warning.
+
+### Added
+
+- **`p6_fallback`** (True) and **`corrupt_record_alert`** on the calendar-map entry of a corrupt record: `{severity: 'ALERT', context: 'calendar-corrupt-p6-fallback', message}`, the message naming the calendar, the type it holds and the week it declares. A report computed on the fallback should disclose it.
+- **`calendar_corrupt_fallbacks(cal_map)`** lists those alerts, one per corrupt record. Empty when none.
+- **`CalendarCorruptRecordWarning`**, a `UserWarning` subclass `get_calendar_map` raises once per corrupt record, naming it and its type.
+
+### Testing
+
+- `tests/test_corrupt_calendar_record_2026_10_28.py` has 12 tests, all synthetic. Seven fail on v0.4.0; four pin what must not move (finish-first records with each legal type, an illegal type on start-first slots, a clean record, an empty record); one compares the parser's decoder with `cpp-cpm-engine`'s, field for field and alert for alert, when the engine's `python_reference` directory is on `sys.path`. CI runs the file under pytest and directly.
+- `tests/test_calendar_slot_order_2026_09_29.py`: the fixture that decodes both slot orders from one file now carries the `CA_Base` type a genuine export writes.
+- `pytest tests/` is 142 tests across 14 files: 140 pass and the two engine-parity tests skip, and all 142 pass with `cpp-cpm-engine`'s `python_reference` on `sys.path` (at v2.10.1 and at v2.10.14).
+
+---
+
 ## v0.4.0 — 2026-10-13
 
 The data date and the calendars are read the way P6 schedules from them. Each rule was measured on Primavera P6 Professional 23.12.1's own F9, and each is the one `cpp-cpm-engine` v2.10.1's `parseXER` applies.
