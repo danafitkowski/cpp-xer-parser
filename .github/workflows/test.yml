@@ -37,3 +37,4 @@ jobs:
           python tests/test_report_summary_2026_09_29.py
           python tests/test_calendar_shift_hours_2026_10_10.py
           python tests/test_p6_rules_2026_10_13.py
+          python tests/test_corrupt_calendar_record_2026_10_28.py

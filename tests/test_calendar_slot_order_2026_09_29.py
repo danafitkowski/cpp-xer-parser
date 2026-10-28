@@ -113,14 +113,17 @@ def test_start_first_week_still_decodes():
 
 def test_both_orders_decode_from_one_file():
     """Both orders occur in one genuine export, so the decoder cannot pick an
-    order per file. Decoded together through get_calendar_map."""
+    order per file. Decoded together through get_calendar_map. The rows carry
+    a legal clndr_type, as a genuine export does: finish-first slots with no
+    legal type are a corrupt record (test_corrupt_calendar_record_2026_10_28)."""
     data = {'tables': {'CALENDAR': {
-        'fields': ['clndr_id', 'clndr_name', 'day_hr_cnt', 'clndr_data'],
+        'fields': ['clndr_id', 'clndr_name', 'clndr_type', 'day_hr_cnt',
+                   'clndr_data'],
         'records': [
-            {'clndr_id': 'C5', 'clndr_name': 'Five day', 'day_hr_cnt': '9',
-             'clndr_data': _start_first_five_day()},
-            {'clndr_id': 'C6', 'clndr_name': 'Six day', 'day_hr_cnt': '9',
-             'clndr_data': _finish_first_six_day()},
+            {'clndr_id': 'C5', 'clndr_name': 'Five day', 'clndr_type': 'CA_Base',
+             'day_hr_cnt': '9', 'clndr_data': _start_first_five_day()},
+            {'clndr_id': 'C6', 'clndr_name': 'Six day', 'clndr_type': 'CA_Base',
+             'day_hr_cnt': '9', 'clndr_data': _finish_first_six_day()},
         ]}}}
     cal_map = get_calendar_map(data)
     assert cal_map['C5']['work_days'] == [1, 2, 3, 4, 5]
