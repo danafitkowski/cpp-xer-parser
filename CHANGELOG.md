@@ -9,6 +9,7 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 ### Changed
 
 - **DCMA-14 #10 Resources passes only at 100% on every profile** (`config_profiles.py`: commercial 80, nuclear 90 and mining 70 become 100). Every incomplete activity of at least one working day must carry a resource assignment with hours or cost, as CPP's written DCMA-14 definition says ([criticalpathpartners.ca/dcma-14-definition.html](https://criticalpathpartners.ca/dcma-14-definition.html)), and the check is not scored when a file carries no assignments. The file is now identical to the copy [`cpp-critical-path-validator`](https://github.com/danafitkowski/cpp-critical-path-validator) bundles.
+- **The nuclear and mining profiles carry the thresholds CPP's own tools use** (`config_profiles.py`; 14 values differed). Nuclear: #1 1% (was 2%), #3 2% (3%), #5 2% (3%), #6 over 30 working days (44), #8 over 20 working days (30). Mining: #1 5% (8%), #3 10% (8%), #6 over 90 working days and 10% (60, 8%), #8 over 90 working days and 10% (60, 8%), #11 5% (8%), #13 0.93 (0.90), #14 0.92 (0.90). The commercial profile is unchanged. The file is still identical to the copy `cpp-critical-path-validator` bundles.
 
 ## v0.5.0 — 2026-10-28
 
