@@ -4,6 +4,12 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
+## Unreleased
+
+### Changed
+
+- **DCMA-14 #10 Resources passes only at 100% on every profile** (`config_profiles.py`: commercial 80, nuclear 90 and mining 70 become 100). Every incomplete activity of at least one working day must carry a resource assignment with hours or cost, as CPP's written DCMA-14 definition says ([criticalpathpartners.ca/dcma-14-definition.html](https://criticalpathpartners.ca/dcma-14-definition.html)), and the check is not scored when a file carries no assignments. The file is now identical to the copy [`cpp-critical-path-validator`](https://github.com/danafitkowski/cpp-critical-path-validator) bundles.
+
 ## v0.5.0 — 2026-10-28
 
 A corrupt calendar record is read the way P6 schedules it: on P6's internal Standard calendar, not on the week the record declares.
