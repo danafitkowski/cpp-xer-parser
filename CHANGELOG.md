@@ -4,7 +4,11 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
-## Unreleased
+## v0.6.0 — 2026-11-08
+
+The DCMA-14 profiles in `config_profiles.py` now carry the thresholds CPP's own tools use, as CPP's written DCMA-14 definition sets them ([criticalpathpartners.ca/dcma-14-definition.html](https://criticalpathpartners.ca/dcma-14-definition.html)). The file is identical to the copy [`cpp-critical-path-validator`](https://github.com/danafitkowski/cpp-critical-path-validator) bundles. The parser itself (`xer_parser.py`) is unchanged.
+
+**Why a minor release.** Before 1.0 this project moves the minor number for a release that changes results a caller already reads. A caller that grades DCMA-14 with these profiles sees #10 move on every profile, and the nuclear and mining profiles move on the checks listed below.
 
 ### Changed
 
