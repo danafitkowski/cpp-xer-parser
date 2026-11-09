@@ -49,7 +49,12 @@ _SKILL_VERSION = '2.0.0'
 # ─────────────────────────────────────────────
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _CPP_COMMON = os.path.normpath(os.path.join(_SCRIPT_DIR, '..', '..', '_cpp_common', 'scripts'))
-if os.path.isdir(_CPP_COMMON) and _CPP_COMMON not in sys.path:
+# The package this module was imported from: 'cpp_xer_parser' when installed,
+# '' from a clone or run as a script. __spec__.parent, not __package__, which
+# Python 3.15 schedules for removal.
+_PKG = __spec__.parent if __spec__ is not None else ''
+# Only from a clone: an installed copy has no sibling _cpp_common.
+if not _PKG and os.path.isdir(_CPP_COMMON) and _CPP_COMMON not in sys.path:
     sys.path.insert(0, _CPP_COMMON)
 
 # Optional imports, guarded so xer_parser stays useful in callers that do not
@@ -64,8 +69,14 @@ if os.path.isdir(_CPP_COMMON) and _CPP_COMMON not in sys.path:
 # raised RuntimeError on a clean clone even though their dependencies were
 # sitting next to them. Keep these blocks separate.
 try:
-    from validation import Finding, ValidationReport, BLOCK, WARN, INFO, PASS
-    from config_profiles import get_profile
+    if _PKG:
+        # Installed with pip, the modules are the package cpp_xer_parser.
+        from .validation import Finding, ValidationReport, BLOCK, WARN, INFO, PASS
+        from .config_profiles import get_profile
+    else:
+        # A clone with scripts/ on sys.path: they are top-level modules.
+        from validation import Finding, ValidationReport, BLOCK, WARN, INFO, PASS
+        from config_profiles import get_profile
     _VALIDATION_AVAILABLE = True
 except ImportError:
     _VALIDATION_AVAILABLE = False

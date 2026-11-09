@@ -1,9 +1,9 @@
 # cpp-xer-parser
 
-[![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/danafitkowski/cpp-xer-parser/blob/main/LICENSE)
 [![python: 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![tests](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/danafitkowski/cpp-xer-parser/actions/workflows/test.yml)
-[![version: 0.6.0](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
+[![version: 0.6.1](https://img.shields.io/badge/version-0.6.1-blue.svg)](https://github.com/danafitkowski/cpp-xer-parser/blob/main/CHANGELOG.md)
 
 A standalone parser and generator for Primavera P6 XER files. Pure Python 3.10+, MIT-licensed, no third-party runtime dependencies.
 
@@ -38,9 +38,16 @@ It comes out of forensic schedule analysis, where a silently mangled field becom
 ## Install
 
 ```bash
+pip install cpp-xer-parser
+```
+
+Installed, the modules are the package `cpp_xer_parser`. The command `cpp-xer-parser` runs the same command line as `python scripts/xer_parser.py`.
+
+Or use a clone with no install: no external dependencies, just put `scripts/` on your `sys.path`.
+
+```bash
 git clone https://github.com/danafitkowski/cpp-xer-parser
 cd cpp-xer-parser
-# No external dependencies. Just put scripts/ on your sys.path.
 ```
 
 The parser is pure Python 3.10+ with no third-party runtime dependencies.
@@ -50,10 +57,9 @@ The parser is pure Python 3.10+ with no third-party runtime dependencies.
 ## Quick start
 
 ```python
-import sys
-sys.path.insert(0, 'scripts')
-
-from xer_parser import parse_xer, print_summary, get_table, build_wbs_map
+from cpp_xer_parser import parse_xer, print_summary, get_table, build_wbs_map
+# From a clone instead: sys.path.insert(0, 'scripts'), then
+# from xer_parser import parse_xer, print_summary, get_table, build_wbs_map
 
 # Parse
 data = parse_xer('path/to/your.xer')
@@ -117,8 +123,9 @@ for t in tasks[:3]:
 A blank `TASK.clndr_id` means the project calendar, not "no calendar". MPXJ writes it blank for every task of a converted MS Project file that has no task-level calendar. Looked up as it stands, `cal_map.get(task['clndr_id'])` returns `None`, and whatever runs next falls to its last resort: 8 h/day in `duration_hours_to_days`, without a word, and in `cpp-cpm-engine` a continuous seven-day week, with an ALERT, unless the caller hands it the project calendar. Take the TASK rows through the resolver before looking a calendar up:
 
 ```python
-from xer_parser import (get_table, get_calendar_map, duration_hours_to_days,
-                        resolve_task_calendars, with_resolved_calendars)
+from cpp_xer_parser.xer_parser import (
+    get_table, get_calendar_map, duration_hours_to_days,
+    resolve_task_calendars, with_resolved_calendars)
 
 resolution = resolve_task_calendars(data)
 tasks = with_resolved_calendars(get_table(data, 'TASK'), resolution)
@@ -147,7 +154,7 @@ The most analytically interesting feature in the repo. The `compute_half_step_xe
 The forensic value: anything that moves in the half-step moved because work didn't happen as planned. Anything that moves between the half-step and the full update moved because the contractor revised logic or scope.
 
 ```python
-from xer_parser import compute_half_step_xer
+from cpp_xer_parser import compute_half_step_xer
 
 result = compute_half_step_xer(
     base_xer_path='period_start.xer',
@@ -225,7 +232,7 @@ Two consequences worth being explicit about:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/danafitkowski/cpp-xer-parser/blob/main/LICENSE).
 
 You may use this parser in commercial forensic consulting, in academic research, in your own scheduling product, in court-filed expert reports. Just keep the copyright notice.
 
@@ -233,7 +240,7 @@ You may use this parser in commercial forensic consulting, in academic research,
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and pull requests are welcome.
+See [CONTRIBUTING.md](https://github.com/danafitkowski/cpp-xer-parser/blob/main/CONTRIBUTING.md). Bug reports and pull requests are welcome.
 
 ---
 
