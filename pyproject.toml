@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cpp-xer-parser"
+version = "0.6.1"
+description = "Parse and write Primavera P6 XER files in pure Python: every table, calendars, cross-reference maps, half-step XERs and DCMA-14 profiles."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Dana Fitkowski" }]
+keywords = ["primavera", "p6", "xer", "schedule", "cpm", "construction", "forensic", "dcma"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Other Audience",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Office/Business :: Scheduling",
+    "Topic :: File Formats",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/danafitkowski/cpp-xer-parser"
+Changelog = "https://github.com/danafitkowski/cpp-xer-parser/blob/main/CHANGELOG.md"
+Issues = "https://github.com/danafitkowski/cpp-xer-parser/issues"
+
+[project.scripts]
+cpp-xer-parser = "cpp_xer_parser.xer_parser:main"
+
+# The modules live in scripts/, where the tests and a plain clone find them as
+# top-level modules. Installed, they are the package cpp_xer_parser, so the
+# generic names (validation, config_profiles) do not land at the top level.
+[tool.setuptools]
+package-dir = { "cpp_xer_parser" = "scripts" }
+packages = ["cpp_xer_parser"]

@@ -1,0 +1,79 @@
+name: publish
+
+# Publishes to PyPI when a GitHub release is published. It uses PyPI trusted
+# publishing (OpenID Connect): no API token is stored anywhere. Before the
+# first release, the project's owner adds this repository and this workflow
+# as a trusted publisher on pypi.org (environment "pypi").
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the sdist and wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test the commit being released
+        run: |
+          python -m pip install --upgrade pip pytest
+          pytest tests/ -q
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check --strict dist/*
+
+      - name: Install the wheel in a clean environment and parse a schedule
+        shell: bash
+        run: |
+          python -m venv /tmp/pkg
+          /tmp/pkg/bin/pip install dist/*.whl
+          cd /tmp && /tmp/pkg/bin/python "$GITHUB_WORKSPACE/.github/smoke_installed.py"
+
+      - name: The release tag names the version being built
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import os, re, sys
+          version = re.search(r'(?m)^version = "([^"]+)"$', open('pyproject.toml').read()).group(1)
+          tag = os.environ['GITHUB_REF_NAME']
+          if tag != 'v' + version:
+              sys.exit('release tag %s is not v%s' % (tag, version))
+          # The changelog dates the release (not 'Unreleased').
+          heading = r'(?m)^## v%s \u2014 \d{4}-\d{2}-\d{2}$' % re.escape(version)
+          if not re.search(heading, open('CHANGELOG.md', encoding='utf-8').read()):
+              sys.exit('CHANGELOG.md has no dated heading for v%s' % version)
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/cpp-xer-parser/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -4,6 +4,15 @@ All notable changes to `cpp-xer-parser` are documented here. Versioning follows 
 
 ---
 
+## v0.6.1 — 2026-11-09
+
+The parser installs from PyPI: `pip install cpp-xer-parser`. Nothing it computes changes.
+
+### Added
+
+- **Packaging** (`pyproject.toml`). Installed, `scripts/` is the package `cpp_xer_parser`, so `from cpp_xer_parser import parse_xer` works and the generic module names (`validation`, `config_profiles`) do not land at the top level of an environment. The command `cpp-xer-parser` runs the parser's command line. A clone with `scripts/` on `sys.path` works as before: `xer_parser.py` binds its two helpers from the package when installed, else as top-level modules.
+- **Release workflow** (`.github/workflows/publish.yml`). Publishing a GitHub release builds the sdist and wheel, checks the release tag names the version in `pyproject.toml`, and uploads to PyPI by trusted publishing, so no API token is stored. CI also builds the wheel, installs it in a clean environment and runs the command on every push.
+
 ## v0.6.0 — 2026-11-08
 
 The DCMA-14 profiles in `config_profiles.py` now carry the thresholds CPP's own tools use, as CPP's written DCMA-14 definition sets them ([criticalpathpartners.ca/dcma-14-definition.html](https://criticalpathpartners.ca/dcma-14-definition.html)). The file is identical to the copy [`cpp-critical-path-validator`](https://github.com/danafitkowski/cpp-critical-path-validator) bundles. The parser itself (`xer_parser.py`) is unchanged.
